@@ -78,8 +78,8 @@ float exeTime;
   #include <Update.h>
 
   const char* host = "esp32";
-  const char* ssid = "xxx";
-  const char* password = "xxxx";
+  const char* ssid = "PHILIP-LAPTOP 9945";
+  const char* password = "2X393,d9"; 
 
   WebServer server(80);
 
@@ -271,7 +271,7 @@ void setup() {// This is stuff for connecting the PS3 controller.
 void loop() {
   server.handleClient();
   delay(1);
-
+  Serial.println("New code");
   // Run if the controller is connected
   if (Ps3.isConnected()) {
     #ifdef SHOW_EXECUTION_TIME

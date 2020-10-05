@@ -1,4 +1,4 @@
-#include <Servo.h>
+#include "../src/ESP32Servo/src/ESP32Servo.h"
 Servo motor1, motor2, motor3, motor4;         // Define motor objects
 static int vertical = 0, horizontal = 0, turn = 0;
 static int motorDirection = 1;

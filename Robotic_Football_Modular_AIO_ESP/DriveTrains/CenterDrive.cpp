@@ -1,4 +1,5 @@
-#include <Servo.h>
+#include "../src/ESP32Servo/src/ESP32Servo.h"
+
 Servo leftMotor, rightMotor;        // Define motor objects
 static int drive = 0;               // Initial speed before turning calculations
 static int turn = 0;                // Turn is adjustment to drive for each motor separately to create turns

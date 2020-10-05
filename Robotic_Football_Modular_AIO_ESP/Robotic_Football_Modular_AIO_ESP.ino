@@ -78,13 +78,8 @@ float exeTime;
   #include <Update.h>
 
   const char* host = "esp32";
-<<<<<<< HEAD
-  const char* ssid = "PHILIP-DESKTOP 6621";
-  const char* password = "18o06(W6";
-=======
-  const char* ssid = "PHILIP-LAPTOP 9945";
-  const char* password = "2X393,d9"; 
->>>>>>> d17a9d2959c214952e6437c179a90af9aea243bd
+  const char* ssid = "FootballRobotsRasPi";
+  const char* password = "FootballRobots";
 
   WebServer server(80);
 

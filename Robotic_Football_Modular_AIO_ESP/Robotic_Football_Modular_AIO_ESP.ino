@@ -73,91 +73,104 @@ float exeTime;
 #ifdef REMOTE
   #include <WiFi.h>
   #include <WiFiClient.h>
-  #include <WebServer.h>
-  #include <ESPmDNS.h>
+  #include <ESPAsyncWebServer.h>
+  #include <SPIFFS.h>
   #include <Update.h>
+  #include "src/pubsubclient/src/PubSubClient.h"
 
-  const char* host = "esp32";
-  const char* ssid = "FootballRobotsRasPi";
+  const char* ssid = "RoboticFootballRasPi";
   const char* password = "FootballRobots";
 
-  WebServer server(80);
+  // Add your MQTT Broker IP address, example:
+  //const char* mqtt_server = "192.168.1.144";
+  const char* mqtt_server = "192.168.4.1";
 
-  /*
-  * Login page
-  */
+  WiFiClient espClient;
+  PubSubClient client(espClient);
+  long lastMsg = 0;
+  char msg[50];
+  int value = 0;
 
-  /* Style */
-  String style =
-  "<style>#file-input,input{width:100%;height:44px;border-radius:4px;margin:10px auto;font-size:15px}"
-  "input{background:#f1f1f1;border:0;padding:0 15px}body{background:#3498db;font-family:sans-serif;font-size:14px;color:#777}"
-  "#file-input{padding:0;border:1px solid #ddd;line-height:44px;text-align:left;display:block;cursor:pointer}"
-  "#bar,#prgbar{background-color:#f1f1f1;border-radius:10px}#bar{background-color:#3498db;width:0%;height:10px}"
-  "form{background:#fff;max-width:258px;margin:75px auto;padding:30px;border-radius:5px;text-align:center}"
-  ".btn{background:#3498db;color:#fff;cursor:pointer}</style>";
-
-  /* Login page */
-  String loginIndex = 
-  "<form name=loginForm>"
-  "<h1>ESP32 Login</h1>"
-  "<input name=userid placeholder='User ID'> "
-  "<input name=pwd placeholder=Password type=Password> "
-  "<input type=submit onclick=check(this.form) class=btn value=Login></form>"
-  "<script>"
-  "function check(form) {"
-  "if(form.userid.value=='admin' && form.pwd.value=='admin')"
-  "{window.open('/serverIndex')}"
-  "else"
-  "{alert('Error Password or Username')}"
-  "}"
-  "</script>" + style;
-  
-  /* Server Index Page */
-  String serverIndex = 
-  "<script src='https://ajax.googleapis.com/ajax/libs/jquery/3.2.1/jquery.min.js'></script>"
-  "<form method='POST' action='#' enctype='multipart/form-data' id='upload_form'>"
-  "<input type='file' name='update' id='file' onchange='sub(this)' style=display:none>"
-  "<label id='file-input' for='file'>   Choose file...</label>"
-  "<input type='submit' class=btn value='Update'>"
-  "<br><br>"
-  "<div id='prg'></div>"
-  "<br><div id='prgbar'><div id='bar'></div></div><br></form>"
-  "<script>"
-  "function sub(obj){"
-  "var fileName = obj.value.split('\\\\');"
-  "document.getElementById('file-input').innerHTML = '   '+ fileName[fileName.length-1];"
-  "};"
-  "$('form').submit(function(e){"
-  "e.preventDefault();"
-  "var form = $('#upload_form')[0];"
-  "var data = new FormData(form);"
-  "$.ajax({"
-  "url: '/update',"
-  "type: 'POST',"
-  "data: data,"
-  "contentType: false,"
-  "processData:false,"
-  "xhr: function() {"
-  "var xhr = new window.XMLHttpRequest();"
-  "xhr.upload.addEventListener('progress', function(evt) {"
-  "if (evt.lengthComputable) {"
-  "var per = evt.loaded / evt.total;"
-  "$('#prg').html('progress: ' + Math.round(per*100) + '%');"
-  "$('#bar').css('width',Math.round(per*100) + '%');"
-  "}"
-  "}, false);"
-  "return xhr;"
-  "},"
-  "success:function(d, s) {"
-  "console.log('success!') "
-  "},"
-  "error: function (a, b, c) {"
-  "}"
-  "});"
-  "});"
-  "</script>" + style;
+  AsyncWebServer server(80);
 #endif
 
+// // handle the upload of the firmware
+// void handleUpload(AsyncWebServerRequest *request, String filename, size_t index, uint8_t *data, size_t len, bool final)
+// {
+//     // handle upload and update
+//     if (!index)
+//     {
+//         Serial.printf("Update: %s\n", filename.c_str());
+//         if (!Update.begin(UPDATE_SIZE_UNKNOWN))
+//         { //start with max available size
+//             Update.printError(Serial);
+//         }
+//     }
+
+//     /* flashing firmware to ESP*/
+//     if (len)
+//     {
+//         Update.write(data, len);
+//     }
+
+//     if (final)
+//     {
+//         if (Update.end(true))
+//         { //true to set the size to the current progress
+//             Serial.printf("Update Success: %ub written\nRebooting...\n", index+len);
+//         }
+//         else
+//         {
+//             Update.printError(Serial);
+//         }
+//     }
+//     // alternative approach
+//     // https://github.com/me-no-dev/ESPAsyncWebServer/issues/542#issuecomment-508489206
+// }
+
+void callback(char* topic, byte* message, unsigned int length) {
+  Serial.print("Message arrived on topic: ");
+  Serial.print(topic);
+  Serial.print(". Message: ");
+  String messageTemp;
+  
+  for (int i = 0; i < length; i++) {
+    Serial.print((char)message[i]);
+    messageTemp += (char)message[i];
+  }
+  Serial.println();
+
+  // Feel free to add more if statements to control more GPIOs with MQTT
+
+  // If a message is received on the topic esp32/output, you check if the message is either "on" or "off". 
+  // Changes the output state according to the message
+  if (String(topic) == "esp32/output") {
+    Serial.print("Changing output to ");
+    if(messageTemp == "on"){
+      Serial.println("on");
+    }
+    else if(messageTemp == "off"){
+      Serial.println("off");
+    }
+  }
+}
+
+
+void reconnect() {
+  // Loop until we're reconnected
+  while (!client.connected()) {
+    Serial.print("Attempting MQTT connection...");
+    // Attempt to connect
+    if (client.connect("ES32Client")) {
+      Serial.println("connected");
+      // Subscribe
+      client.subscribe("esp32/input");
+    } else {
+      Serial.print("failed, rc=");
+      Serial.print(client.state());
+    }
+  }
+}
 
 void setup() {// This is stuff for connecting the PS3 controller.
   Serial.begin(115200);       //Begin Serial Communications
@@ -165,7 +178,13 @@ void setup() {// This is stuff for connecting the PS3 controller.
   flashLeds();
 
   #ifdef REMOTE
-      // Connect to WiFi network
+    
+    if(!SPIFFS.begin(true)){
+      Serial.println("An Error has occurred while mounting SPIFFS");
+      return;
+    }
+    
+    // Connect to WiFi network
     WiFi.begin(ssid, password);
     Serial.println("");
 
@@ -174,55 +193,58 @@ void setup() {// This is stuff for connecting the PS3 controller.
       delay(500);
       Serial.print(".");
     }
+
     Serial.println("");
     Serial.print("Connected to ");
     Serial.println(ssid);
     Serial.print("IP address: ");
     Serial.println(WiFi.localIP());
 
-    /*use mdns for host name resolution*/
-    if (!MDNS.begin(host)) { //http://esp32.local
-      Serial.println("Error setting up MDNS responder!");
-      while (1) {
-        delay(1000);
-      }
-    }
-    Serial.println("mDNS responder started");
-    /*return index page which is stored in serverIndex */
-    server.on("/", HTTP_GET, []() {
-      server.sendHeader("Connection", "close");
-      server.send(200, "text/html", loginIndex);
+    // Route for root / web page
+    server.on("/", HTTP_GET, [](AsyncWebServerRequest *request){
+      request->send(SPIFFS, "/loginindex.html", "text/html");
     });
-    server.on("/serverIndex", HTTP_GET, []() {
-      server.sendHeader("Connection", "close");
-      server.send(200, "text/html", serverIndex);
+    
+    // Route to load jquery file
+    server.on("/jquery.min.js", HTTP_GET, [](AsyncWebServerRequest *request){
+      request->send(SPIFFS, "/jquery/jquery.min.js", "text/javascript");
     });
-    /*handling uploading firmware file */
-    server.on("/update", HTTP_POST, []() {
-      server.sendHeader("Connection", "close");
-      server.send(200, "text/plain", (Update.hasError()) ? "FAIL" : "OK");
-      ESP.restart();
-    }, []() {
-      HTTPUpload& upload = server.upload();
-      if (upload.status == UPLOAD_FILE_START) {
-        Serial.printf("Update: %s\n", upload.filename.c_str());
-        if (!Update.begin(UPDATE_SIZE_UNKNOWN)) { //start with max available size
-          Update.printError(Serial);
-        }
-      } else if (upload.status == UPLOAD_FILE_WRITE) {
-        /* flashing firmware to ESP*/
-        if (Update.write(upload.buf, upload.currentSize) != upload.currentSize) {
-          Update.printError(Serial);
-        }
-      } else if (upload.status == UPLOAD_FILE_END) {
-        if (Update.end(true)) { //true to set the size to the current progress
-          Serial.printf("Update Success: %u\nRebooting...\n", upload.totalSize);
-        } else {
-          Update.printError(Serial);
-        }
-      }
+
+    server.on("/serverIndex", HTTP_GET, [](AsyncWebServerRequest *request){
+      request->send(SPIFFS, "/serverindex.html", "text/html");
     });
+
+    // /*handling uploading firmware file */
+    // server.on("/update", HTTP_POST, []() {
+    //   server.sendHeader("Connection", "close");
+    //   server.send(200, "text/plain", (Update.hasError()) ? "FAIL" : "OK");
+    //   ESP.restart();
+    // }, []() {
+    //   HTTPUpload& upload = server.upload();
+    //   if (upload.status == UPLOAD_FILE_START) {
+    //     Serial.printf("Update: %s\n", upload.filename.c_str());
+    //     if (!Update.begin(UPDATE_SIZE_UNKNOWN)) { //start with max available size
+    //       Update.printError(Serial);
+    //     }
+    //   } else if (upload.status == UPLOAD_FILE_WRITE) {
+    //     /* flashing firmware to ESP*/
+    //     if (Update.write(upload.buf, upload.currentSize) != upload.currentSize) {
+    //       Update.printError(Serial);
+    //     }
+    //   } else if (upload.status == UPLOAD_FILE_END) {
+    //     if (Update.end(true)) { //true to set the size to the current progress
+    //       Serial.printf("Update Success: %u\nRebooting...\n", upload.totalSize);
+    //     } else {
+    //       Update.printError(Serial);
+    //     }
+    //   }
+    // });
+
+    // Start server
     server.begin();
+
+    client.setServer(mqtt_server, 1883);
+    //client.setCallback(callback);
   #endif
 
   
@@ -269,9 +291,20 @@ void setup() {// This is stuff for connecting the PS3 controller.
 
 
 void loop() {
-  server.handleClient();
-  delay(1);
-  Serial.println("New code");
+   if (!client.connected()) {
+    reconnect();
+  }
+  //client.loop();
+  
+  long now = millis();
+  if (now  - lastMsg > 5000) {
+    lastMsg = now;
+    char timeString[8];
+    gcvt (millis(), 6, timeString);
+    Serial.print("Time: ");
+    Serial.println(timeString);
+    client.publish("esp32/output", timeString);
+  }
   // Run if the controller is connected
   if (Ps3.isConnected()) {
     #ifdef SHOW_EXECUTION_TIME

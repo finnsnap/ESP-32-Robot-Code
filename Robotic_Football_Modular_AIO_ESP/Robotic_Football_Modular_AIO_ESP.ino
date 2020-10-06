@@ -1,7 +1,14 @@
 #include "src/esp32-ps3-develop/src/Ps3Controller.h"
 #include "src/ESP32Servo/src/ESP32Servo.h"
 
-#define REMOTE
+#include <WiFi.h>
+#include <WiFiClient.h>
+#include <ESPAsyncWebServer.h>
+#include <SPIFFS.h>
+#include <Update.h>
+#include "src/pubsubclient/src/PubSubClient.h"
+#include <ArduinoJson.h>
+
 //#define CONTROLLER
 
 //===========Uncomment a LED===========================
@@ -70,31 +77,26 @@ ps3_cmd_t cmd;
 float exeTime;
 
 
-#ifdef REMOTE
-  #include <WiFi.h>
-  #include <WiFiClient.h>
-  #include <ESPAsyncWebServer.h>
-  #include <SPIFFS.h>
-  #include <Update.h>
-  #include "src/pubsubclient/src/PubSubClient.h"
-  #include <ArduinoJson.h>
+const char* ssid = "RoboticFootballRasPi";
+const char* password = "FootballRobots";
 
-  const char* ssid = "RoboticFootballRasPi";
-  const char* password = "FootballRobots";
+// Add your MQTT Broker IP address, example:
+//const char* mqtt_server = "192.168.1.144";
+const char* mqtt_server = "192.168.4.1";
 
-  // Add your MQTT Broker IP address, example:
-  //const char* mqtt_server = "192.168.1.144";
-  const char* mqtt_server = "192.168.4.1";
+WiFiClient espClient;
+PubSubClient client(espClient);
 
-  WiFiClient espClient;
-  PubSubClient client(espClient);
+unsigned long lastMsg = 0;
+unsigned long now = 0;
+unsigned long lastWiFiAttempt = 0;
+unsigned long lastMQTTAttempt = 0;
 
-  long lastMsg = 0;
-  char msg[50];
-  int value = 0;
+char msg[50];
+int value = 0;
 
-  AsyncWebServer server(80);
-#endif
+AsyncWebServer server(80);
+
 
 // // handle the upload of the firmware
 // void handleUpload(AsyncWebServerRequest *request, String filename, size_t index, uint8_t *data, size_t len, bool final)
@@ -159,19 +161,16 @@ void callback(char* topic, byte* message, unsigned int length) {
 
 
 void reconnect() {
-  // Loop until we're reconnected
-  while (!client.connected()) {
-    Serial.print("Attempting MQTT connection...");
-    // Attempt to connect
-    if (client.connect("ES32Client")) {
-      Serial.println("connected");
-      // Subscribe
-      client.subscribe("esp32/input");
-    } else {
-      Serial.print("failed, rc=");
-      Serial.print(client.state());
-      delay(2000);
-    }
+  // Attempt to connect
+  if (client.connect("ES32Client")) {
+    Serial.println("MQTT connected");
+    // Subscribe
+    client.subscribe("esp32/input");
+  } 
+  else {
+    Serial.print("MQTT failed, rc=");
+    Serial.print(client.state());
+    Serial.print("\n");
   }
 }
 
@@ -180,76 +179,62 @@ void setup() {// This is stuff for connecting the PS3 controller.
   ledsSetup();          //Setup the leds
   flashLeds();
 
-  #ifdef REMOTE
+  if(!SPIFFS.begin(true)){
+    Serial.println("An Error has occurred while mounting SPIFFS");
+    return;
+  }
+
+  // Connect to WiFi network
+  WiFi.begin(ssid, password);
+
+  // Start web server
+  server.begin();
+  
+  // Route for root / web page
+  server.on("/", HTTP_GET, [](AsyncWebServerRequest *request){
+    request->send(SPIFFS, "/loginindex.html", "text/html");
+  });
     
-    if(!SPIFFS.begin(true)){
-      Serial.println("An Error has occurred while mounting SPIFFS");
-      return;
-    }
-    
-    // Connect to WiFi network
-    WiFi.begin(ssid, password);
-    Serial.println("");
-    
-    // Wait for connection
-    while (WiFi.status() != WL_CONNECTED) {
-      delay(500);
-      Serial.print(".");
-    }
+  // Route to load jquery file
+  server.on("/jquery.min.js", HTTP_GET, [](AsyncWebServerRequest *request){
+    request->send(SPIFFS, "/jquery/jquery.min.js", "text/javascript");
+  });
 
-    Serial.println("");
-    Serial.print("Connected to ");
-    Serial.println(ssid);
-    Serial.print("IP address: ");
-    Serial.println(WiFi.localIP());
+  server.on("/serverIndex", HTTP_GET, [](AsyncWebServerRequest *request){
+    request->send(SPIFFS, "/serverindex.html", "text/html");
+  });
 
-    // Route for root / web page
-    server.on("/", HTTP_GET, [](AsyncWebServerRequest *request){
-      request->send(SPIFFS, "/loginindex.html", "text/html");
-    });
-    
-    // Route to load jquery file
-    server.on("/jquery.min.js", HTTP_GET, [](AsyncWebServerRequest *request){
-      request->send(SPIFFS, "/jquery/jquery.min.js", "text/javascript");
-    });
+  // /*handling uploading firmware file */
+  // server.on("/update", HTTP_POST, []() {
+  //   server.sendHeader("Connection", "close");
+  //   server.send(200, "text/plain", (Update.hasError()) ? "FAIL" : "OK");
+  //   ESP.restart();
+  // }, []() {
+  //   HTTPUpload& upload = server.upload();
+  //   if (upload.status == UPLOAD_FILE_START) {
+  //     Serial.printf("Update: %s\n", upload.filename.c_str());
+  //     if (!Update.begin(UPDATE_SIZE_UNKNOWN)) { //start with max available size
+  //       Update.printError(Serial);
+  //     }
+  //   } else if (upload.status == UPLOAD_FILE_WRITE) {
+  //     /* flashing firmware to ESP*/
+  //     if (Update.write(upload.buf, upload.currentSize) != upload.currentSize) {
+  //       Update.printError(Serial);
+  //     }
+  //   } else if (upload.status == UPLOAD_FILE_END) {
+  //     if (Update.end(true)) { //true to set the size to the current progress
+  //       Serial.printf("Update Success: %u\nRebooting...\n", upload.totalSize);
+  //     } else {
+ //       Update.printError(Serial);
+  //     }
+  //   }
+  // });
+  
 
-    server.on("/serverIndex", HTTP_GET, [](AsyncWebServerRequest *request){
-      request->send(SPIFFS, "/serverindex.html", "text/html");
-    });
 
-    // /*handling uploading firmware file */
-    // server.on("/update", HTTP_POST, []() {
-    //   server.sendHeader("Connection", "close");
-    //   server.send(200, "text/plain", (Update.hasError()) ? "FAIL" : "OK");
-    //   ESP.restart();
-    // }, []() {
-    //   HTTPUpload& upload = server.upload();
-    //   if (upload.status == UPLOAD_FILE_START) {
-    //     Serial.printf("Update: %s\n", upload.filename.c_str());
-    //     if (!Update.begin(UPDATE_SIZE_UNKNOWN)) { //start with max available size
-    //       Update.printError(Serial);
-    //     }
-    //   } else if (upload.status == UPLOAD_FILE_WRITE) {
-    //     /* flashing firmware to ESP*/
-    //     if (Update.write(upload.buf, upload.currentSize) != upload.currentSize) {
-    //       Update.printError(Serial);
-    //     }
-    //   } else if (upload.status == UPLOAD_FILE_END) {
-    //     if (Update.end(true)) { //true to set the size to the current progress
-    //       Serial.printf("Update Success: %u\nRebooting...\n", upload.totalSize);
-    //     } else {
-    //       Update.printError(Serial);
-    //     }
-    //   }
-    // });
-
-    // Start server
-    server.begin();
-
-    client.setServer(mqtt_server, 1883);
-    client.setCallback(callback);
-  #endif
-
+  // Start mqtt server
+  client.setServer(mqtt_server, 1883);
+  client.setCallback(callback);
   
   #ifdef CONTROLLER
     // Wait for contoller to be connected to the esp
@@ -259,17 +244,15 @@ void setup() {// This is stuff for connecting the PS3 controller.
       blue();
     }
     Serial.println("Controller is connected!");
-  #endif
-
-  // Vibrates controller when you first connect
-  if (newconnect == 0) {
+    
+    // Vibrates controller when you first connect
     cmd.rumble_left_intensity = 0xff;
     cmd.rumble_right_intensity = 0xff;
     cmd.rumble_right_duration = 750;
     cmd.rumble_left_duration = 750;
-    newconnect++;
+    //newconnect++;
     ps3Cmd(cmd);
-  }
+  #endif
 
   //Setup the drive train, peripherals, tackle sensor, and changes leds to green once complete
   driveSetup(motorType);
@@ -286,59 +269,53 @@ void setup() {// This is stuff for connecting the PS3 controller.
       green();
   #else
       blue();
-  #endif
-
-  // Variable(boolean) for connection to ps3, also activates rumble
-  int newconnect = 0;         
+  #endif     
 }
 
 
 void loop() {
-   if (!client.connected()) {
-    reconnect();
-  }
+  #ifdef SHOW_EXECUTION_TIME
+    exeTime = micros();
+  #endif
 
-  long now = millis();
-  if (now  - lastMsg > 5000) {
+  // Stores the current time
+  now = millis();
+
+  if (WiFi.status() != WL_CONNECTED && now - lastWiFiAttempt > 2000) {
+    lastWiFiAttempt = now;
+    Serial.println("WiFi Disconnected");
+  } 
+  else if (WiFi.status() == WL_CONNECTED && !client.connected() && now - lastMQTTAttempt > 2000) {
+    lastMQTTAttempt = now;
+    reconnect();
+  } 
+  else if (client.connected() && now  - lastMsg > 5000) {
     lastMsg = now;
-    char timeString[8];
-    gcvt (millis(), 6, timeString);
-    Serial.print("\nTime: ");
-    Serial.print(timeString);
-    Serial.println();
-    
+
     const int capacity = JSON_OBJECT_SIZE(4);
     StaticJsonDocument<capacity> data;
-    
+
     data["robotName"] = "ESP32";
     data["batteryLevel"] = "33";
     data["contollerStatus"] = "Connected";
     data["timeSinceReset"] = millis();
- 
+
     char buffer[100];
     size_t n = serializeJson(data, buffer);
 
-    Serial.println("Sending message to MQTT topic..");
+    // Print json data to serial port
     serializeJson(data, Serial);
 
-    if (client.publish("esp32/output", buffer, n) == true) {
-      Serial.println("Success sending message");
-    } 
+    if (client.publish("esp32/output", buffer, n)) {
+      Serial.print(" Success sending message\n");
+    }
     else {
-      Serial.println("Error sending message");
-    }  
-    
-    Serial.println("-------------");
+      Serial.print(" Error sending message\n");
+    }
   }
   
-  client.loop();
-
   // Run if the controller is connected
   if (Ps3.isConnected()) {
-    #ifdef SHOW_EXECUTION_TIME
-      exeTime = micros();
-    #endif
-
     // !QUESTION! - What is the point of this code?
     // // Press the PS button to disconnect the controller
     // if (Ps3.data.button.ps && newconnect == 1) {
@@ -366,7 +343,7 @@ void loop() {
       Serial.print(rightX);    
       Serial.print("\t");
       Serial.print(rightY);    
-      Serial.print("\t");
+      Serial.print("\n");
     #endif
 
     //====================Specify the handicap=================================
@@ -454,19 +431,17 @@ void loop() {
     #ifdef PERIPHERAL
         peripheral(Ps3);//Call the peripheral
     #endif
-
-    #ifdef SHOW_EXECUTION_TIME
-      Serial.print("Exe exeTime: ");
-      Serial.print(micros() - exeTime);
-      Serial.print("\t");
-    #endif
-
-    Serial.println();
   }
-
-  // If the controller is not connected, LEDs blue and stop robot
-  if (!Ps3.isConnected()) {
+  else { // If the controller is not connected, LEDs blue and stop robot
     blue();
     driveStop();
-  }
+  } 
+
+  #ifdef SHOW_EXECUTION_TIME
+    Serial.print("Exe exeTime: ");
+    Serial.print(micros() - exeTime);
+    Serial.print("\t");
+  #endif
+
+  client.loop();
 }

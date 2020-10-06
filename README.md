@@ -66,3 +66,4 @@ This is a list of useful links and tutorials that were used.
 * [Node.js and Raspberry Pi - Webserver with WebSocket](https://www.w3schools.com/nodejs/nodejs_raspberrypi_webserver_websocket.asp)
 * [mqtt-panel](https://github.com/fabaff/mqtt-panel)
 * [Node.js + Nginx](https://stackoverflow.com/questions/5009324/node-js-nginx-what-now)
+* [How to use ArduinoJson with PubSubClient?](https://arduinojson.org/v6/how-to/use-arduinojson-with-pubsubclient/)

@@ -77,6 +77,7 @@ float exeTime;
   #include <SPIFFS.h>
   #include <Update.h>
   #include "src/pubsubclient/src/PubSubClient.h"
+  #include <ArduinoJson.h>
 
   const char* ssid = "RoboticFootballRasPi";
   const char* password = "FootballRobots";
@@ -87,6 +88,7 @@ float exeTime;
 
   WiFiClient espClient;
   PubSubClient client(espClient);
+
   long lastMsg = 0;
   char msg[50];
   int value = 0;
@@ -144,7 +146,7 @@ void callback(char* topic, byte* message, unsigned int length) {
 
   // If a message is received on the topic esp32/output, you check if the message is either "on" or "off". 
   // Changes the output state according to the message
-  if (String(topic) == "esp32/output") {
+  if (String(topic) == "esp32/input") {
     Serial.print("Changing output to ");
     if(messageTemp == "on"){
       Serial.println("on");
@@ -168,6 +170,7 @@ void reconnect() {
     } else {
       Serial.print("failed, rc=");
       Serial.print(client.state());
+      delay(2000);
     }
   }
 }
@@ -187,7 +190,7 @@ void setup() {// This is stuff for connecting the PS3 controller.
     // Connect to WiFi network
     WiFi.begin(ssid, password);
     Serial.println("");
-
+    
     // Wait for connection
     while (WiFi.status() != WL_CONNECTED) {
       delay(500);
@@ -244,7 +247,7 @@ void setup() {// This is stuff for connecting the PS3 controller.
     server.begin();
 
     client.setServer(mqtt_server, 1883);
-    //client.setCallback(callback);
+    client.setCallback(callback);
   #endif
 
   
@@ -294,17 +297,42 @@ void loop() {
    if (!client.connected()) {
     reconnect();
   }
-  //client.loop();
-  
+
   long now = millis();
   if (now  - lastMsg > 5000) {
     lastMsg = now;
     char timeString[8];
     gcvt (millis(), 6, timeString);
-    Serial.print("Time: ");
-    Serial.println(timeString);
-    client.publish("esp32/output", timeString);
+    Serial.print("\nTime: ");
+    Serial.print(timeString);
+    Serial.println();
+    
+    const int capacity = JSON_OBJECT_SIZE(4);
+    StaticJsonDocument<capacity> data;
+    
+    data["robotName"] = "ESP32";
+    data["batteryLevel"] = "33";
+    data["contollerStatus"] = "Connected";
+    data["timeSinceReset"] = millis();
+ 
+    char buffer[100];
+    size_t n = serializeJson(data, buffer);
+
+    Serial.println("Sending message to MQTT topic..");
+    serializeJson(data, Serial);
+
+    if (client.publish("esp32/output", buffer, n) == true) {
+      Serial.println("Success sending message");
+    } 
+    else {
+      Serial.println("Error sending message");
+    }  
+    
+    Serial.println("-------------");
   }
+  
+  client.loop();
+
   // Run if the controller is connected
   if (Ps3.isConnected()) {
     #ifdef SHOW_EXECUTION_TIME

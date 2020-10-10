@@ -144,10 +144,6 @@ void callback(char* topic, byte* message, unsigned int length) {
   }
   Serial.println();
 
-  // Feel free to add more if statements to control more GPIOs with MQTT
-
-  // If a message is received on the topic esp32/output, you check if the message is either "on" or "off". 
-  // Changes the output state according to the message
   if (String(topic) == "esp32/input") {
     Serial.print("Changing output to ");
     if(messageTemp == "on"){
@@ -178,7 +174,7 @@ void setup() {// This is stuff for connecting the PS3 controller.
   Serial.begin(115200);       //Begin Serial Communications
   ledsSetup();          //Setup the leds
   flashLeds();
-
+  Serial.println("ESP32 starting up");
   if(!SPIFFS.begin(true)){
     Serial.println("An Error has occurred while mounting SPIFFS");
     return;
@@ -187,22 +183,22 @@ void setup() {// This is stuff for connecting the PS3 controller.
   // Connect to WiFi network
   WiFi.begin(ssid, password);
 
-  // Start web server
-  server.begin();
+  // // Start web server
+  // server.begin();
   
-  // Route for root / web page
-  server.on("/", HTTP_GET, [](AsyncWebServerRequest *request){
-    request->send(SPIFFS, "/loginindex.html", "text/html");
-  });
+  // // Route for root / web page
+  // server.on("/", HTTP_GET, [](AsyncWebServerRequest *request){
+  //   request->send(SPIFFS, "/loginindex.html", "text/html");
+  // });
     
-  // Route to load jquery file
-  server.on("/jquery.min.js", HTTP_GET, [](AsyncWebServerRequest *request){
-    request->send(SPIFFS, "/jquery/jquery.min.js", "text/javascript");
-  });
+  // // Route to load jquery file
+  // server.on("/jquery.min.js", HTTP_GET, [](AsyncWebServerRequest *request){
+  //   request->send(SPIFFS, "/jquery/jquery.min.js", "text/javascript");
+  // });
 
-  server.on("/serverIndex", HTTP_GET, [](AsyncWebServerRequest *request){
-    request->send(SPIFFS, "/serverindex.html", "text/html");
-  });
+  // server.on("/serverIndex", HTTP_GET, [](AsyncWebServerRequest *request){
+  //   request->send(SPIFFS, "/serverindex.html", "text/html");
+  // });
 
   // /*handling uploading firmware file */
   // server.on("/update", HTTP_POST, []() {
@@ -272,50 +268,19 @@ void setup() {// This is stuff for connecting the PS3 controller.
   #endif     
 }
 
+const int capacity = JSON_OBJECT_SIZE(5);
+StaticJsonDocument<capacity> data;
+char buffer[256];
 
 void loop() {
   #ifdef SHOW_EXECUTION_TIME
     exeTime = micros();
   #endif
-
-  // Stores the current time
-  now = millis();
-
-  if (WiFi.status() != WL_CONNECTED && now - lastWiFiAttempt > 2000) {
-    lastWiFiAttempt = now;
-    Serial.println("WiFi Disconnected");
-  } 
-  else if (WiFi.status() == WL_CONNECTED && !client.connected() && now - lastMQTTAttempt > 2000) {
-    lastMQTTAttempt = now;
-    reconnect();
-  } 
-  else if (client.connected() && now  - lastMsg > 5000) {
-    lastMsg = now;
-
-    const int capacity = JSON_OBJECT_SIZE(4);
-    StaticJsonDocument<capacity> data;
-
-    data["robotName"] = "ESP32";
-    data["batteryLevel"] = "33";
-    data["contollerStatus"] = "Connected";
-    data["timeSinceReset"] = millis();
-
-    char buffer[100];
-    size_t n = serializeJson(data, buffer);
-
-    // Print json data to serial port
-    serializeJson(data, Serial);
-
-    if (client.publish("esp32/output", buffer, n)) {
-      Serial.print(" Success sending message\n");
-    }
-    else {
-      Serial.print(" Error sending message\n");
-    }
-  }
-  
+  data["tackleStatus"] = " ";
   // Run if the controller is connected
   if (Ps3.isConnected()) {
+    data["contollerStatus"] = "Connected";
+
     // !QUESTION! - What is the point of this code?
     // // Press the PS button to disconnect the controller
     // if (Ps3.data.button.ps && newconnect == 1) {
@@ -388,6 +353,7 @@ void loop() {
     }
 
     //=================================Tackle Sensor===========================
+
     #ifdef TACKLE
       // NORMAL OPERATION MODE
       // for the if statement for whether or not
@@ -410,6 +376,7 @@ void loop() {
       if (!digitalRead(TACKLE_INPUT))
       {
         red();
+        data["tackleStatus"] = "Tackled";
         if (!hasIndicated) {
           //PS3.setRumbleOn(10, 255, 10, 255);
           hasIndicated = true;
@@ -420,8 +387,10 @@ void loop() {
         if (stayTackled == false) {
           hasIndicated = false;
           green();
+          data["tackleStatus"] = "Not tackled";
         }
       }
+
     #endif
     //===============================================================================================
 
@@ -435,6 +404,7 @@ void loop() {
   else { // If the controller is not connected, LEDs blue and stop robot
     blue();
     driveStop();
+    data["contollerStatus"] = "Disconnected";
   } 
 
   #ifdef SHOW_EXECUTION_TIME
@@ -442,6 +412,37 @@ void loop() {
     Serial.print(micros() - exeTime);
     Serial.print("\t");
   #endif
+
+  // Stores the current time
+  now = millis();
+
+  if (WiFi.status() != WL_CONNECTED && now - lastWiFiAttempt > 2000) {
+    lastWiFiAttempt = now;
+    Serial.println("WiFi Disconnected");
+  } 
+  else if (WiFi.status() == WL_CONNECTED && !client.connected() && now - lastMQTTAttempt > 2000) {
+    lastMQTTAttempt = now;
+    reconnect();
+  } 
+  else if (client.connected() && now  - lastMsg > 200) {
+    lastMsg = now;
+
+    data["robotNumber"] = "r1";
+    data["IPAddress"] = WiFi.localIP().toString().c_str();
+    data["batteryLevel"] = "22";
+
+    size_t n = serializeJson(data, buffer);
+
+    // Print json data to serial port
+    serializeJson(data, Serial);
+
+    if (client.publish("esp32/output", buffer, n)) {
+      Serial.print(" Success sending message\n");
+    }
+    else {
+      Serial.print(" Error sending message\n");
+    }
+  }
 
   client.loop();
 }

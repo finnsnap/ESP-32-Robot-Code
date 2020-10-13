@@ -3,13 +3,13 @@
 
 #include <WiFi.h>
 #include <WiFiClient.h>
-#include <ESPAsyncWebServer.h>
-#include <SPIFFS.h>
-#include <Update.h>
+//#include <ESPAsyncWebServer.h>
+//#include <SPIFFS.h>
+//#include <Update.h>
 #include "src/pubsubclient/src/PubSubClient.h"
 #include <ArduinoJson.h>
 
-//#define CONTROLLER
+#define CONTROLLER
 
 //===========Uncomment a LED===========================
 #include "Leds/Leds.cpp"
@@ -95,8 +95,14 @@ unsigned long lastMQTTAttempt = 0;
 char msg[50];
 int value = 0;
 
-AsyncWebServer server(80);
+char name[] = "rK9";
+char macaddress[] = "00:15:83:f3:e8:e8";
 
+//AsyncWebServer server(80);
+
+const int capacity = JSON_OBJECT_SIZE(6);
+StaticJsonDocument<capacity> data;
+char buffer[256];
 
 // // handle the upload of the firmware
 // void handleUpload(AsyncWebServerRequest *request, String filename, size_t index, uint8_t *data, size_t len, bool final)
@@ -158,16 +164,17 @@ void callback(char* topic, byte* message, unsigned int length) {
 
 void reconnect() {
   // Attempt to connect
-  if (client.connect("ES32Client")) {
+  if (client.connect(name)) {
     Serial.println("MQTT connected");
     // Subscribe
-    client.subscribe("esp32/input");
+    //client.subscribe("esp32/input");
   } 
   else {
     Serial.print("MQTT failed, rc=");
     Serial.print(client.state());
     Serial.print("\n");
   }
+  delay(5);
 }
 
 void setup() {// This is stuff for connecting the PS3 controller.
@@ -175,10 +182,10 @@ void setup() {// This is stuff for connecting the PS3 controller.
   ledsSetup();          //Setup the leds
   flashLeds();
   Serial.println("ESP32 starting up");
-  if(!SPIFFS.begin(true)){
-    Serial.println("An Error has occurred while mounting SPIFFS");
-    return;
-  }
+  // if(!SPIFFS.begin(true)){
+  //   Serial.println("An Error has occurred while mounting SPIFFS");
+  //   return;
+  // }
 
   // Connect to WiFi network
   WiFi.begin(ssid, password);
@@ -234,21 +241,23 @@ void setup() {// This is stuff for connecting the PS3 controller.
   
   #ifdef CONTROLLER
     // Wait for contoller to be connected to the esp
-    Ps3.begin("00:1b:dc:0f:f3:59");
-    while(!Ps3.isConnected()){
-      Serial.println("Controller not connected");
-      blue();
-    }
-    Serial.println("Controller is connected!");
+
+    Ps3.begin(macaddress);
+    // while(!Ps3.isConnected()){
+    //   Serial.println("Controller not connected");
+    //   blue();
+    // }
+    // Serial.println("Controller is connected!");
     
     // Vibrates controller when you first connect
-    cmd.rumble_left_intensity = 0xff;
-    cmd.rumble_right_intensity = 0xff;
-    cmd.rumble_right_duration = 750;
-    cmd.rumble_left_duration = 750;
-    //newconnect++;
-    ps3Cmd(cmd);
+    // cmd.rumble_left_intensity = 0xff;
+    // cmd.rumble_right_intensity = 0xff;
+    // cmd.rumble_right_duration = 750;
+    // cmd.rumble_left_duration = 750;
+    // //newconnect++;
+    // ps3Cmd(cmd);
   #endif
+  
 
   //Setup the drive train, peripherals, tackle sensor, and changes leds to green once complete
   driveSetup(motorType);
@@ -265,18 +274,19 @@ void setup() {// This is stuff for connecting the PS3 controller.
       green();
   #else
       blue();
-  #endif     
+  #endif   
 }
-
-const int capacity = JSON_OBJECT_SIZE(5);
-StaticJsonDocument<capacity> data;
-char buffer[256];
 
 void loop() {
   #ifdef SHOW_EXECUTION_TIME
     exeTime = micros();
   #endif
   data["tackleStatus"] = " ";
+
+  // if (WiFi.status() == WL_CONNECTED){
+  //   data["IPAddress"] = WiFi.localIP().toString().c_str();
+  // }
+
   // Run if the controller is connected
   if (Ps3.isConnected()) {
     data["contollerStatus"] = "Connected";
@@ -409,26 +419,27 @@ void loop() {
 
   #ifdef SHOW_EXECUTION_TIME
     Serial.print("Exe exeTime: ");
-    Serial.print(micros() - exeTime);
-    Serial.print("\t");
+    Serial.println(micros() - exeTime);
   #endif
 
   // Stores the current time
   now = millis();
 
-  if (WiFi.status() != WL_CONNECTED && now - lastWiFiAttempt > 2000) {
+  client.loop();
+
+  if (WiFi.status() != WL_CONNECTED) {
     lastWiFiAttempt = now;
     Serial.println("WiFi Disconnected");
   } 
-  else if (WiFi.status() == WL_CONNECTED && !client.connected() && now - lastMQTTAttempt > 2000) {
+  else if (!client.connected()) {
+    Serial.println("Trying to connect to MQTT");
     lastMQTTAttempt = now;
     reconnect();
   } 
-  else if (client.connected() && now  - lastMsg > 200) {
+  else if (now  - lastMsg > 200) {
     lastMsg = now;
 
-    data["robotNumber"] = "r1";
-    data["IPAddress"] = WiFi.localIP().toString().c_str();
+    data["robotNumber"] = name;
     data["batteryLevel"] = "22";
 
     size_t n = serializeJson(data, buffer);
@@ -444,5 +455,4 @@ void loop() {
     }
   }
 
-  client.loop();
 }

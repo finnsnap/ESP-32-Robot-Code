@@ -2,8 +2,11 @@
 #include "src/ESP32Servo/src/ESP32Servo.h"
 
 #include <WiFi.h>
+#include <WiFiClient.h>
 #include <HTTPClient.h>
 #include <HTTPUpdate.h>
+
+#include <EEPROM.h>
 
 #include "src/pubsubclient/src/PubSubClient.h"
 #include "src/ArduinoJson/ArduinoJson-v6.16.1.h"
@@ -64,49 +67,79 @@
 #endif
 //===================================
 
-#define TACKLE_INPUT    13           // Tackle sensor is wired to pin 6
+// Tackle sensor is wired to pin 13
+#define TACKLE_INPUT 13           
 bool hasIndicated = false;
 bool stayTackled = false;
-int handicap = 3;
+
+// Default handicap is 3 with no kids mode
+int handicap = 3;       
 bool kidsMode = false;
-int newconnect = 0;
+
+// Define joystick variables and other useful variables
 int leftX, leftY, rightX, rightY;
+int newconnect = 0;
 ps3_cmd_t cmd;
 float exeTime;
 
 
 // Read battery is analog read pin 35
 
-
-const char* ssid = "RoboticFootballRasPi";
-const char* password = "FootballRobots";
-
-// Add your MQTT Broker IP address, example:
-//const char* mqtt_server = "192.168.1.144";
-const char* mqtt_server = "192.168.4.1";
-
+// Name and password of the WiFi network to connect to
+//const char* ssid = "RoboticFootballRasPi";
+//const char* password = "FootballRobots";
+const char* ssid = "PHILIP-LAPTOP";
+const char* password = "2X393,d9";
 WiFiClient wifiClient;
+//WiFiEventHandler gotIpEventHandler, disconnectedEventHandler;
+
+// IP address of the MQTT broker to connect to
+const char* mqtt_server = "192.168.137.211"; //"192.168.4.1";
 PubSubClient mqttClient(wifiClient);
 
+// Storing timing values
 unsigned long lastMsg = 0;
 unsigned long now = 0;
 unsigned long lastWiFiAttempt = 0;
 unsigned long lastMQTTAttempt = 0;
 
-char msg[50];
-int value = 0;
 
 // Change name and contoller address for each robot
 char name[] = "rK9";
 char macaddress[] = "00:15:83:f3:e8:e8";
 
+// JSON variables for sending data to webserver
 const int capacity = JSON_OBJECT_SIZE(6);
 StaticJsonDocument<capacity> data;
 char buffer[256];
 
+// Contoller battery level
 int battery = 0;
 
-void callback(char* topic, byte* message, unsigned int length) {
+void writeName(const char* robotName) {
+  for (unsigned int i = 0; i < strlen(robotName); i++) {
+    EEPROM.write(i, robotName[i]);
+  }
+  EEPROM.write(strlen(robotName), '\0');
+
+}
+
+char* readName() {
+  char name[10];
+  unsigned int len = 0;
+  unsigned char k;
+  k = EEPROM.read(len);
+  while (k != '\0' && len < 15) {
+    k = EEPROM.read(len);
+    name[len] = k;
+    len++;
+  }
+
+  return name;
+}
+
+
+void callback(const char* topic, byte* message, unsigned int length) {
   Serial.print("Message arrived on topic: ");
   Serial.print(topic);
   Serial.print(". Message: ");
@@ -120,23 +153,39 @@ void callback(char* topic, byte* message, unsigned int length) {
 
   if (String(topic) == "esp32/input") {
     Serial.print("Changing output to ");
-    if(messageTemp == "on"){
-      Serial.println("on");
+    if(messageTemp == name){
+      Serial.println("Reprogramming");
+      update();
     }
-    else if(messageTemp == "off"){
-      Serial.println("off");
+    else if(messageTemp == "read"){
+      char robotNAme = ;
+      robotNAme = readName();
+      Serial.print("Name read from EEPROM: ");
+      Serial.print(robotNAme);
+      Serial.print("\n");
+    }
+    else if(messageTemp == "write"){
+      char robotNAme[] = "r32";
+      writeName(robotNAme);
+      Serial.print("Name written to EEPROM: ");
+      Serial.print(robotNAme);
+      Serial.print("\n");
+    }
+    else {
+      Serial.println("Invalid message");
     }
   }
 }
 
+/**
+ * Tries to connect to the MQTT server and subscribe to the esp32/(robotName) topic
+ */
 void reconnect() {
   // Attempt to connect
   if (mqttClient.connect(name)) {
     Serial.println("MQTT connected");
     // Subscribe
-    char topic[7 + strlen(name)] = "esp32/";
-    strcat(topic, name); /* add the extension */
-    mqttClient.subscribe(topic);
+    mqttClient.subscribe("esp32/input");
   } 
   else {
     Serial.print("MQTT failed, rc=");
@@ -145,36 +194,40 @@ void reconnect() {
   }
 }
 
+/**
+ * Updates the esp32 code over http by connecting to a remote webserver
+ */
 void update() {
-  // The line below is optional. It can be used to blink the LED on the board during flashing
-    // The LED will be on during download of one buffer of data from the network. The LED will
-    // be off during writing that buffer to flash
-    // On a good connection the LED should flash regularly. On a bad connection the LED will be
-    // on much longer than it will be off. Other pins than LED_BUILTIN may be used. The second
-    // value is used to put the LED on. If the LED is on with HIGH, that value should be passed
-    // httpUpdate.setLedPin(LED_BUILTIN, LOW);
+  mqttClient.disconnect();
+  Serial.println("MQTT disconnected");
 
-    t_httpUpdate_return ret = httpUpdate.update(wifiClient, "http://server/file.bin");
-    // Or:
-    //t_httpUpdate_return ret = httpUpdate.update(mqttClient, "server", 80, "/file.bin");
+  t_httpUpdate_return ret = httpUpdate.update(wifiClient, "http://192.168.137.211:8080/public/esp32.bin");
+  
+  switch (ret) {
+    case HTTP_UPDATE_FAILED:
+      Serial.printf("HTTP_UPDATE_FAILED Error (%d): %s\n", httpUpdate.getLastError(), httpUpdate.getLastErrorString().c_str());
+      break;
 
-    switch (ret) {
-      case HTTP_UPDATE_FAILED:
-        Serial.printf("HTTP_UPDATE_FAILED Error (%d): %s\n", httpUpdate.getLastError(), httpUpdate.getLastErrorString().c_str());
-        break;
+    case HTTP_UPDATE_NO_UPDATES:
+      Serial.println("HTTP_UPDATE_NO_UPDATES");
+      break;
 
-      case HTTP_UPDATE_NO_UPDATES:
-        Serial.println("HTTP_UPDATE_NO_UPDATES");
-        break;
-
-      case HTTP_UPDATE_OK:
-        Serial.println("HTTP_UPDATE_OK");
-        break;
-    }
+    case HTTP_UPDATE_OK:
+      Serial.println("HTTP_UPDATE_OK");
+      break;
+  }
 }
 
-void setRumbleOn(uint8_t rightDuration, uint8_t rightPower, uint8_t leftDuration, uint8_t leftPower) {
-    cmd.rumble_right_duration = rightDuration;    
+/**
+ * Rumbles the right and left of the contoller based on the given intensity and length values. 
+ * 
+ * @param rightDuration The duration of the right side rumble in ms
+ * @param rightPower The strength of the right side rumble 
+ * @param leftDuration The duration of the left side rumble in ms
+ * @param leftPower The strength of the left side rumble
+ */
+void rumbleContoller(uint8_t rightDuration, uint8_t rightPower, uint8_t leftDuration, uint8_t leftPower) {
+    cmd.rumble_right_duration = rightDuration;
     cmd.rumble_right_intensity = rightPower;
     cmd.rumble_left_intensity = leftPower;
     cmd.rumble_left_duration = leftDuration;
@@ -182,11 +235,15 @@ void setRumbleOn(uint8_t rightDuration, uint8_t rightPower, uint8_t leftDuration
     ps3Cmd(cmd);
 }
 
+/**
+ * Callback function for when the contoller connects. This will vibrate the contoller only on the first connection after the robot is turned on.
+ */
 void onControllerConnect(){
     // Vibrates controller when you connect
     if (newconnect == 0) {
-      setRumbleOn(50, 255, 50, 255);
+      rumbleContoller(50, 255, 50, 255);
       newconnect++;
+      ps3SetLed(1);
     }
 
     Serial.println("Controller is connected!");
@@ -198,14 +255,22 @@ void setup() {// This is stuff for connecting the PS3 controller.
   flashLeds();
   Serial.println("ESP32 starting up");
 
-  // Connect to WiFi network
+  // Setup WiFi event handlers and begin WiFi connection
+  // gotIpEventHandler = WiFi.onStationModeGotIP([](const WiFiEventStationModeGotIP& event) {
+  //   Serial.print("Station connected, IP: ");
+  //   Serial.println(WiFi.localIP());
+  // });
+
+  // disconnectedEventHandler = WiFi.onStationModeDisconnected([](const WiFiEventStationModeDisconnected& event) {
+  //   Serial.println("Station disconnected");
+  // });
   WiFi.begin(ssid, password);
 
   // Start mqtt server
   mqttClient.setServer(mqtt_server, 1883);
   mqttClient.setCallback(callback);
   
-  // Wait for contoller to be connected to the esp
+  // Attached the contoller connect function to connection callback and start contoller connection
   Ps3.attachOnConnect(onControllerConnect);
   Ps3.begin(macaddress);
   // while(!Ps3.isConnected()){
@@ -213,7 +278,6 @@ void setup() {// This is stuff for connecting the PS3 controller.
   //   blue();
   // }
   
-
   //Setup the drive train, peripherals, tackle sensor, and changes leds to green once complete
   driveSetup(motorType);
 
@@ -245,8 +309,6 @@ void loop() {
 
   // Run if the controller is connected
   if (Ps3.isConnected()) {
-    //Ps3.setPlayer(1);
-
     data["contollerStatus"] = "Connected";
     
     // if( battery != Ps3.data.status.battery ){
@@ -297,13 +359,13 @@ void loop() {
       if (kidsMode == true) {
         kidsMode = false;
         handicap = 3;
-        Ps3.setPlayer(5);     // ON OFF OFF ON          
-        //setRumbleOn(5, 255, 5, 255);      // vibrate both, then left, then right
+        ps3SetLed(5);     // ON OFF OFF ON          
+        rumbleContoller(5, 255, 5, 255);      // vibrate both, then left, then right
       } else if (kidsMode == false) {
         kidsMode = true;
         handicap = 7;
-        Ps3.setPlayer(1);     // OFF OFF OFF ON
-        //setRumbleOn(5, 255, 5, 255);      // vibrate both, then left, then right
+        ps3SetLed(1);     // OFF OFF OFF ON
+        rumbleContoller(5, 255, 5, 255);      // vibrate both, then left, then right
       }
     }
 
@@ -326,10 +388,12 @@ void loop() {
     if (Ps3.data.button.left){
       correctMotor(1);
       Serial.println("Left button clicked");
+      rumbleContoller(0, 0, 5, 255);
     }
     if (Ps3.data.button.right){
       correctMotor(-1);
-      Serial.println("right button clicked");
+      Serial.println("Right button clicked");
+      rumbleContoller(5, 255, 0, 0);
     }
 
     //=================================Tackle Sensor===========================
@@ -345,22 +409,14 @@ void loop() {
         else {
           stayTackled = true;
         }
-        setRumbleOn(30, 255, 30, 255);
-        /*
-          Ps3.data.cmd.rumble_right_duration(30);
-          Ps3.data.cmd.rumble_right_intensity(255);
-          Ps3.data.cmd.rumble_left_duration(30);
-          Ps3.data.cmd.rumble_left_intensity(255);
-        */
-        //PS3.//setRumbleOn(30, 255, 30, 255);
+        rumbleContoller(30, 255, 30, 255);
       }
       if (!digitalRead(TACKLE_INPUT))
       {
         red();
         data["tackleStatus"] = "Tackled";
         if (!hasIndicated) {
-          setRumbleOn(10, 255, 10, 255);
-          //PS3.//setRumbleOn(10, 255, 10, 255);
+          rumbleContoller(10, 255, 10, 255);
           hasIndicated = true;
         }
       }
@@ -387,7 +443,6 @@ void loop() {
     blue();
     driveStop();
     data["contollerStatus"] = "Disconnected";
-    
   } 
 
   #ifdef SHOW_EXECUTION_TIME
@@ -402,10 +457,18 @@ void loop() {
 
   if (WiFi.status() != WL_CONNECTED) {
     lastWiFiAttempt = now;
-    Serial.println("WiFi Disconnected");
+    //Serial.println("WiFi Disconnected");
+    
+    // if wifi is down, try reconnecting every 30 seconds
+    // if ((WiFi.status() != WL_CONNECTED) && (millis() > 30000)) {
+    //   Serial.println("Reconnecting to WiFi...");
+    //   WiFi.disconnect();
+    //   WiFi.begin(SSID, PASS);
+    //   check_wifi = millis() + 30000;
+    // }
   } 
   else if (!mqttClient.connected()) {
-    Serial.println("Trying to connect to MQTT");
+    //Serial.println("Trying to connect to MQTT");
     lastMQTTAttempt = now;
     reconnect();
   } 

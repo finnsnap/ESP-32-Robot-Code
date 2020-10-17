@@ -74,4 +74,3 @@ This is a list of useful links and tutorials that were used.
 ## TODO
 * Replace EEPROM with esp32-Preferences
 * Replace pubsubclient with async-mqtt-client
-* Fix cpu panic when no name is stored in the eeprom

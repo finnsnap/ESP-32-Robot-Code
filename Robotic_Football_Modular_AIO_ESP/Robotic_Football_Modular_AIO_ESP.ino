@@ -88,13 +88,13 @@ float exeTime;
 // Name and password of the WiFi network to connect to
 //const char* ssid = "RoboticFootballRasPi";
 //const char* password = "FootballRobots";
-const char* ssid = "PHILIP-DESKTOP";
-const char* password = "18o06(W6";
+const char* ssid = "PHILIP-LAPTOP";
+const char* password = "2X393,d9";
 WiFiClient wifiClient;
 //WiFiEventHandler gotIpEventHandler, disconnectedEventHandler;
 
 // IP address of the MQTT broker to connect to
-const char* mqtt_server = "192.168.137.223"; //"192.168.4.1";
+const char* mqtt_server = "192.168.137.211"; //"192.168.4.1";
 PubSubClient mqttClient(wifiClient);
 
 // Storing timing values
@@ -133,6 +133,7 @@ int battery = 0;
 
 #define EEPROM_SIZE 16
 
+
 void writeStoredName(String data) {
   int stringSize = data.length();
   if (stringSize <= 3){
@@ -144,17 +145,14 @@ void writeStoredName(String data) {
     // name[stringSize] = '\0';
 
     EEPROM.commit();
-
-    
   }
 }
 
 void readStoredName() {
-  int len=0;
+  int len = 0;
   unsigned char k;
   k = EEPROM.read(0);
-  while(k != '\0' && len < EEPROM_SIZE)   //Read until null character
-  {
+  while(k != '\0' && len < EEPROM_SIZE) {     //Read until null character
     k = EEPROM.read(len);
     name[len] = k;
     len++;
@@ -162,41 +160,14 @@ void readStoredName() {
   name[len]='\0';
   
   for (int i = 0; i < 18; i++) { // Change 18 to make work with any length array
-      
-      if (strcmp(name, robotNames[i]) == 0) {
-        macaddress = macAddresses[i];
-        Serial.println(robotNames[i]);
-        Serial.println(macaddress);
-        break;
-      }
-      
+    if (strcmp(name, robotNames[i]) == 0) {
+      macaddress = macAddresses[i];
+      Serial.println(robotNames[i]);
+      Serial.println(macaddress);
+      break;
     }
+  }
 }
-
-// void writeString(int address, char* data)
-// {
-//   int stringSize = strlen(data);
-//   for(int i=0; i < stringSize; i++) {
-//     EEPROM.write(address+i, data[i]);
-//   }
-//   EEPROM.write(address + stringSize,'\0');   //Add termination null character
-//   EEPROM.commit();
-// }
-
-// String readString(int address) {
-//   char data[EEPROM_SIZE];
-//   int len=0;
-//   unsigned char k;
-//   k = EEPROM.read(address);
-//   while(k != '\0' && len < EEPROM_SIZE)   //Read until null character
-//   {
-//     k = EEPROM.read(address + len);
-//     data[len] = k;
-//     len++;
-//   }
-//   data[len]='\0';
-//   return data;
-// }
 
 
 void callback(const char* topic, byte* message, unsigned int length) {
@@ -455,7 +426,6 @@ void loop() {
     data["espMacAddress"] = WiFi.macAddress();
   }
 
-  Serial.println("Running contoller");
   // Run if the controller is connected
   if (Ps3.isConnected()) {
     data["contollerStatus"] = "Connected";

@@ -8,7 +8,8 @@
 
 #include <EEPROM.h>
 
-#include "src/pubsubclient/src/PubSubClient.h"
+#include <AsyncMqttClient.h>
+
 #include "src/ArduinoJson/ArduinoJson-v6.16.1.h"
 
 
@@ -93,10 +94,102 @@ const char* password = "2X393,d9";
 WiFiClient wifiClient;
 //WiFiEventHandler gotIpEventHandler, disconnectedEventHandler;
 
-// IP address of the MQTT broker to connect to
-const char* mqtt_server = "192.168.137.211"; //"192.168.4.1";
-PubSubClient mqttClient(wifiClient);
+#define MQTT_HOST IPAddress(192, 168, 137, 211)
+#define MQTT_PORT 1883
 
+AsyncMqttClient mqttClient;
+TimerHandle_t mqttReconnectTimer;
+TimerHandle_t wifiReconnectTimer;
+
+void connectToWifi() {
+  Serial.println("Connecting to Wi-Fi...");
+  WiFi.begin(ssid, password);
+}
+
+void connectToMqtt() {
+  Serial.println("Connecting to MQTT...");
+  mqttClient.connect();
+}
+
+void WiFiEvent(WiFiEvent_t event) {
+    Serial.printf("[WiFi-event] event: %d\n", event);
+    switch(event) {
+    case SYSTEM_EVENT_STA_GOT_IP:
+        Serial.println("WiFi connected");
+        Serial.println("IP address: ");
+        Serial.println(WiFi.localIP());
+        connectToMqtt();
+        break;
+    case SYSTEM_EVENT_STA_DISCONNECTED:
+        Serial.println("WiFi lost connection");
+        xTimerStop(mqttReconnectTimer, 0); // ensure we don't reconnect to MQTT while reconnecting to Wi-Fi
+		    xTimerStart(wifiReconnectTimer, 0);
+        break;
+    }
+}
+
+void onMqttConnect(bool sessionPresent) {
+  Serial.println("Connected to MQTT.");
+  Serial.print("Session present: ");
+  Serial.println(sessionPresent);
+  uint16_t packetIdSub = mqttClient.subscribe("esp32/input", 2);
+  Serial.print("Subscribing at QoS 2, packetId: ");
+  Serial.println(packetIdSub);
+  mqttClient.publish("esp32/output", 0, true, "test 1");
+  Serial.println("Publishing at QoS 0");
+  uint16_t packetIdPub1 = mqttClient.publish("esp32/output", 1, true, "test 2");
+  Serial.print("Publishing at QoS 1, packetId: ");
+  Serial.println(packetIdPub1);
+  uint16_t packetIdPub2 = mqttClient.publish("esp32/output", 2, true, "test 3");
+  Serial.print("Publishing at QoS 2, packetId: ");
+  Serial.println(packetIdPub2);
+}
+
+void onMqttDisconnect(AsyncMqttClientDisconnectReason reason) {
+  Serial.println("Disconnected from MQTT.");
+
+  if (WiFi.isConnected()) {
+    xTimerStart(mqttReconnectTimer, 0);
+  }
+}
+
+void onMqttSubscribe(uint16_t packetId, uint8_t qos) {
+  Serial.println("Subscribe acknowledged.");
+  Serial.print("  packetId: ");
+  Serial.println(packetId);
+  Serial.print("  qos: ");
+  Serial.println(qos);
+}
+
+void onMqttUnsubscribe(uint16_t packetId) {
+  Serial.println("Unsubscribe acknowledged.");
+  Serial.print("  packetId: ");
+  Serial.println(packetId);
+}
+
+void onMqttMessage(char* topic, char* payload, AsyncMqttClientMessageProperties properties, size_t len, size_t index, size_t total) {
+  Serial.println("Publish received.");
+  Serial.print("  topic: ");
+  Serial.println(topic);
+  Serial.print("  qos: ");
+  Serial.println(properties.qos);
+  Serial.print("  dup: ");
+  Serial.println(properties.dup);
+  Serial.print("  retain: ");
+  Serial.println(properties.retain);
+  Serial.print("  len: ");
+  Serial.println(len);
+  Serial.print("  index: ");
+  Serial.println(index);
+  Serial.print("  total: ");
+  Serial.println(total);
+}
+
+void onMqttPublish(uint16_t packetId) {
+  Serial.println("Publish acknowledged.");
+  Serial.print("  packetId: ");
+  Serial.println(packetId);
+}
 // Storing timing values
 unsigned long lastMsg = 0;
 unsigned long now = 0;
@@ -214,22 +307,22 @@ void callback(const char* topic, byte* message, unsigned int length) {
   }
 }
 
-/**
- * Tries to connect to the MQTT server and subscribe to the esp32/(robotName) topic
- */
-void reconnect() {
-  // Attempt to connect
-  if (mqttClient.connect(name)) {
-    Serial.println("MQTT connected");
-    // Subscribe
-    mqttClient.subscribe("esp32/input");
-  } 
-  else {
-    Serial.print("MQTT failed, rc=");
-    Serial.print(mqttClient.state());
-    Serial.print("\n");
-  }
-}
+// /**
+//  * Tries to connect to the MQTT server and subscribe to the esp32/(robotName) topic
+//  */
+// void reconnect() {
+//   // Attempt to connect
+//   if (mqttClient.connect(name)) {
+//     Serial.println("MQTT connected");
+//     // Subscribe
+//     mqttClient.subscribe("esp32/input");
+//   } 
+//   else {
+//     Serial.print("MQTT failed, rc=");
+//     Serial.print(mqttClient.state());
+//     Serial.print("\n");
+//   }
+// }
 
 /**
  * Updates the esp32 code over http by connecting to a remote webserver
@@ -381,14 +474,24 @@ void setup() {// This is stuff for connecting the PS3 controller.
   EEPROM.begin(EEPROM_SIZE);
   readStoredName();
 
-  // Setup WiFi event handlers and begin WiFi connection
-  // WiFi.onEvent(WiFiEvent);
-  WiFi.begin(ssid, password);
+  mqttReconnectTimer = xTimerCreate("mqttTimer", pdMS_TO_TICKS(2000), pdFALSE, (void*)0, reinterpret_cast<TimerCallbackFunction_t>(connectToMqtt));
+  wifiReconnectTimer = xTimerCreate("wifiTimer", pdMS_TO_TICKS(2000), pdFALSE, (void*)0, reinterpret_cast<TimerCallbackFunction_t>(connectToWifi));
 
-  // Start mqtt server
-  mqttClient.setServer(mqtt_server, 1883);
-  mqttClient.setCallback(callback);
-  
+  WiFi.onEvent(WiFiEvent);
+
+  mqttClient.onConnect(onMqttConnect);
+  mqttClient.onDisconnect(onMqttDisconnect);
+  mqttClient.onSubscribe(onMqttSubscribe);
+  mqttClient.onUnsubscribe(onMqttUnsubscribe);
+  mqttClient.onMessage(onMqttMessage);
+  mqttClient.onPublish(onMqttPublish);
+  mqttClient.setServer(MQTT_HOST, MQTT_PORT);
+
+  connectToWifi();
+
+  //mqttClient.subscribe("esp32/input", 2);
+
+
   // Attached the contoller connect function to connection callback and start contoller connection
   Ps3.attachOnConnect(onControllerConnect);
   Ps3.begin(macaddress);
@@ -572,42 +675,41 @@ void loop() {
   // Stores the current time
   now = millis();
 
-  mqttClient.loop();
 
-  if (WiFi.status() != WL_CONNECTED) {
-    lastWiFiAttempt = now;
-    //Serial.println("WiFi Disconnected");
+  // if (WiFi.status() != WL_CONNECTED) {
+  //   lastWiFiAttempt = now;
+  //   //Serial.println("WiFi Disconnected");
     
-    // if wifi is down, try reconnecting every 30 seconds
-    // if ((WiFi.status() != WL_CONNECTED) && (millis() > 30000)) {
-    //   Serial.println("Reconnecting to WiFi...");
-    //   WiFi.disconnect();
-    //   WiFi.begin(SSID, PASS);
-    //   check_wifi = millis() + 30000;
-    // }
-  } 
-  else if (!mqttClient.connected()) {
-    //Serial.println("Trying to connect to MQTT");
-    lastMQTTAttempt = now;
-    reconnect();
-  } 
-  else if (now  - lastMsg > 200) {
-    lastMsg = now;
+  //   // if wifi is down, try reconnecting every 30 seconds
+  //   // if ((WiFi.status() != WL_CONNECTED) && (millis() > 30000)) {
+  //   //   Serial.println("Reconnecting to WiFi...");
+  //   //   WiFi.disconnect();
+  //   //   WiFi.begin(SSID, PASS);
+  //   //   check_wifi = millis() + 30000;
+  //   // }
+  // } 
+  // else if (!mqttClient.connected()) {
+  //   //Serial.println("Trying to connect to MQTT");
+  //   lastMQTTAttempt = now;
+  //   reconnect();
+  // } 
+  // else if (now  - lastMsg > 200) {
+  //   lastMsg = now;
 
-    data["robotNumber"] = name;
-    data["batteryLevel"] = "22";
+  //   data["robotNumber"] = name;
+  //   data["batteryLevel"] = "22";
 
-    size_t n = serializeJson(data, buffer);
+  //   size_t n = serializeJson(data, buffer);
 
-    // Print json data to serial port
-    serializeJson(data, Serial);
+  //   // Print json data to serial port
+  //   serializeJson(data, Serial);
 
-    if (mqttClient.publish("esp32/output", buffer, n)) {
-      Serial.print(" Success sending message\n");
-    }
-    else {
-      Serial.print(" Error sending message\n");
-    }
-  }
+  //   if (mqttClient.publish("esp32/output", buffer, n)) {
+  //     Serial.print(" Success sending message\n");
+  //   }
+  //   else {
+  //     Serial.print(" Error sending message\n");
+  //   }
+  // }
 
 }

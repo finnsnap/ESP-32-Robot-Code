@@ -67,3 +67,10 @@ This is a list of useful links and tutorials that were used.
 * [mqtt-panel](https://github.com/fabaff/mqtt-panel)
 * [Node.js + Nginx](https://stackoverflow.com/questions/5009324/node-js-nginx-what-now)
 * [How to use ArduinoJson with PubSubClient?](https://arduinojson.org/v6/how-to/use-arduinojson-with-pubsubclient/)
+* [WiFiClientEvents.ino](https://github.com/espressif/arduino-esp32/blob/master/libraries/WiFi/examples/WiFiClientEvents/WiFiClientEvents.ino)
+* [async-mqtt-client](https://github.com/marvinroger/async-mqtt-client)
+
+
+## TODO
+* Replace EEPROM with esp32-Preferences
+* Replace pubsubclient with async-mqtt-client

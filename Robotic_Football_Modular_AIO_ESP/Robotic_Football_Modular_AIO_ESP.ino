@@ -88,13 +88,13 @@ float exeTime;
 // Name and password of the WiFi network to connect to
 //const char* ssid = "RoboticFootballRasPi";
 //const char* password = "FootballRobots";
-const char* ssid = "PHILIP-LAPTOP";
-const char* password = "2X393,d9";
+const char* ssid = "PHILIP-DESKTOP";
+const char* password = "18o06(W6";
 WiFiClient wifiClient;
 //WiFiEventHandler gotIpEventHandler, disconnectedEventHandler;
 
 // IP address of the MQTT broker to connect to
-const char* mqtt_server = "192.168.137.211"; //"192.168.4.1";
+const char* mqtt_server = "192.168.137.223"; //"192.168.4.1";
 PubSubClient mqttClient(wifiClient);
 
 // Storing timing values
@@ -105,8 +105,23 @@ unsigned long lastMQTTAttempt = 0;
 
 
 // Change name and contoller address for each robot
-char name[] = "rK9";
-char macaddress[] = "00:15:83:f3:e8:e8";
+char name[4];
+char* macaddress;
+
+const char* robotNames[18] = {"r3",  "r7",  "r9", 
+                          "r12", "r16", "r35", 
+                          "r40", "r42", "r44", 
+                          "r53", "r68", "r74", 
+                          "r75", "r81", "r82", 
+                          "r85", "r88", "rK9"};
+
+char* macAddresses[18] = {"00:15:83:f3:e8:d8", "00:15:83:3d:0a:57", "00:1b:dc:0f:aa:58", 
+                             "00:1b:dc:0f:f3:59", "5c:f3:70:78:51:d6", "00:1b:dc:0f:d3:f1", 
+                             "00:1b:dc:0f:f3:59", "00:15:83:f3:e0:09", "00:1b:dc:0f:dc:32", 
+                             "00:1b:dc:0f:dc:3e", "00:1b:dc:0f:d3:e8", "5c:f3:70:78:51:d0", 
+                             "01:02:03:04:05:06", "00:15:83:f3:e8:cd", "5c:f3:70:6e:5f:df", 
+                             "00:1b:dc:0f:dc:2d", "00:1b:dc:0f:e8:af", "00:15:83:f3:e8:e8"};
+
 
 // JSON variables for sending data to webserver
 const int capacity = JSON_OBJECT_SIZE(6);
@@ -116,59 +131,110 @@ char buffer[256];
 // Contoller battery level
 int battery = 0;
 
-void writeName(const char* robotName) {
-  for (unsigned int i = 0; i < strlen(robotName); i++) {
-    EEPROM.write(i, robotName[i]);
-  }
-  EEPROM.write(strlen(robotName), '\0');
+#define EEPROM_SIZE 16
 
+void writeStoredName(String data) {
+  int stringSize = data.length();
+  if (stringSize <= 3){
+    for(int i = 0; i < stringSize; i++) {
+      EEPROM.write(i, data[i]);
+      // name[i] = data[i];
+    }
+    EEPROM.write(stringSize,'\0');   //Add termination null character
+    // name[stringSize] = '\0';
+
+    EEPROM.commit();
+
+    
+  }
 }
 
-char* readName() {
-  char name[10];
-  unsigned int len = 0;
+void readStoredName() {
+  int len=0;
   unsigned char k;
-  k = EEPROM.read(len);
-  while (k != '\0' && len < 15) {
+  k = EEPROM.read(0);
+  while(k != '\0' && len < EEPROM_SIZE)   //Read until null character
+  {
     k = EEPROM.read(len);
     name[len] = k;
     len++;
   }
-
-  return name;
+  name[len]='\0';
+  
+  for (int i = 0; i < 18; i++) { // Change 18 to make work with any length array
+      
+      if (strcmp(name, robotNames[i]) == 0) {
+        macaddress = macAddresses[i];
+        Serial.println(robotNames[i]);
+        Serial.println(macaddress);
+        break;
+      }
+      
+    }
 }
+
+// void writeString(int address, char* data)
+// {
+//   int stringSize = strlen(data);
+//   for(int i=0; i < stringSize; i++) {
+//     EEPROM.write(address+i, data[i]);
+//   }
+//   EEPROM.write(address + stringSize,'\0');   //Add termination null character
+//   EEPROM.commit();
+// }
+
+// String readString(int address) {
+//   char data[EEPROM_SIZE];
+//   int len=0;
+//   unsigned char k;
+//   k = EEPROM.read(address);
+//   while(k != '\0' && len < EEPROM_SIZE)   //Read until null character
+//   {
+//     k = EEPROM.read(address + len);
+//     data[len] = k;
+//     len++;
+//   }
+//   data[len]='\0';
+//   return data;
+// }
 
 
 void callback(const char* topic, byte* message, unsigned int length) {
   Serial.print("Message arrived on topic: ");
   Serial.print(topic);
-  Serial.print(". Message: ");
+  Serial.print(" Message: ");
+  char messageCommand;
   String messageTemp;
+  String messageInput;
+  Serial.print("\n");
   
   for (int i = 0; i < length; i++) {
     Serial.print((char)message[i]);
     messageTemp += (char)message[i];
   }
-  Serial.println();
 
   if (String(topic) == "esp32/input") {
-    Serial.print("Changing output to ");
+    //Serial.print("Changing output to ");
+
+    messageCommand = messageTemp[0]; // Maybe change up to pointers to make more efficient?
+    int index = 0;
+    for (int i = 1; i < length; i++) if (messageTemp[i] == '-') index = i + 1;
+    for (int i = index; i < length; i++) messageInput += messageTemp[i];
+    
     if(messageTemp == name){
       Serial.println("Reprogramming");
       update();
     }
-    else if(messageTemp == "read"){
-      char robotNAme = ;
-      robotNAme = readName();
-      Serial.print("Name read from EEPROM: ");
-      Serial.print(robotNAme);
+    else if(messageCommand == 'r'){
+      readStoredName();
+      Serial.print("Name read from EEPROM:");
+      Serial.print(name);
       Serial.print("\n");
     }
-    else if(messageTemp == "write"){
-      char robotNAme[] = "r32";
-      writeName(robotNAme);
+    else if(messageCommand == 'w'){
+      writeStoredName(messageInput);
       Serial.print("Name written to EEPROM: ");
-      Serial.print(robotNAme);
+      Serial.print(messageInput);
       Serial.print("\n");
     }
     else {
@@ -249,21 +315,103 @@ void onControllerConnect(){
     Serial.println("Controller is connected!");
 }
 
+
+// void WiFiEvent(WiFiEvent_t event)
+// {
+//     Serial.printf("[WiFi-event] event: %d\n", event);
+
+//     switch (event) {
+//         case SYSTEM_EVENT_WIFI_READY: 
+//             Serial.println("WiFi interface ready");
+//             break;
+//         case SYSTEM_EVENT_SCAN_DONE:
+//             Serial.println("Completed scan for access points");
+//             break;
+//         case SYSTEM_EVENT_STA_START:
+//             Serial.println("WiFi client started");
+//             break;
+//         case SYSTEM_EVENT_STA_STOP:
+//             Serial.println("WiFi clients stopped");
+//             break;
+//         case SYSTEM_EVENT_STA_CONNECTED:
+//             Serial.println("Connected to access point");
+//             break;
+//         case SYSTEM_EVENT_STA_DISCONNECTED:
+//             Serial.println("Disconnected from WiFi access point");
+//             break;
+//         case SYSTEM_EVENT_STA_AUTHMODE_CHANGE:
+//             Serial.println("Authentication mode of access point has changed");
+//             break;
+//         case SYSTEM_EVENT_STA_GOT_IP:
+//             Serial.print("Obtained IP address: ");
+//             Serial.println(WiFi.localIP());
+//             break;
+//         case SYSTEM_EVENT_STA_LOST_IP:
+//             Serial.println("Lost IP address and IP address is reset to 0");
+//             break;
+//         case SYSTEM_EVENT_STA_WPS_ER_SUCCESS:
+//             Serial.println("WiFi Protected Setup (WPS): succeeded in enrollee mode");
+//             break;
+//         case SYSTEM_EVENT_STA_WPS_ER_FAILED:
+//             Serial.println("WiFi Protected Setup (WPS): failed in enrollee mode");
+//             break;
+//         case SYSTEM_EVENT_STA_WPS_ER_TIMEOUT:
+//             Serial.println("WiFi Protected Setup (WPS): timeout in enrollee mode");
+//             break;
+//         case SYSTEM_EVENT_STA_WPS_ER_PIN:
+//             Serial.println("WiFi Protected Setup (WPS): pin code in enrollee mode");
+//             break;
+//         case SYSTEM_EVENT_AP_START:
+//             Serial.println("WiFi access point started");
+//             break;
+//         case SYSTEM_EVENT_AP_STOP:
+//             Serial.println("WiFi access point  stopped");
+//             break;
+//         case SYSTEM_EVENT_AP_STACONNECTED:
+//             Serial.println("Client connected");
+//             break;
+//         case SYSTEM_EVENT_AP_STADISCONNECTED:
+//             Serial.println("Client disconnected");
+//             break;
+//         case SYSTEM_EVENT_AP_STAIPASSIGNED:
+//             Serial.println("Assigned IP address to client");
+//             break;
+//         case SYSTEM_EVENT_AP_PROBEREQRECVED:
+//             Serial.println("Received probe request");
+//             break;
+//         case SYSTEM_EVENT_GOT_IP6:
+//             Serial.println("IPv6 is preferred");
+//             break;
+//         case SYSTEM_EVENT_ETH_START:
+//             Serial.println("Ethernet started");
+//             break;
+//         case SYSTEM_EVENT_ETH_STOP:
+//             Serial.println("Ethernet stopped");
+//             break;
+//         case SYSTEM_EVENT_ETH_CONNECTED:
+//             Serial.println("Ethernet connected");
+//             break;
+//         case SYSTEM_EVENT_ETH_DISCONNECTED:
+//             Serial.println("Ethernet disconnected");
+//             break;
+//         case SYSTEM_EVENT_ETH_GOT_IP:
+//             Serial.println("Obtained IP address");
+//             break;
+//         default: break;
+//     }}
+
+
 void setup() {// This is stuff for connecting the PS3 controller.
   Serial.begin(115200);       //Begin Serial Communications
   ledsSetup();          //Setup the leds
   flashLeds();
   Serial.println("ESP32 starting up");
 
-  // Setup WiFi event handlers and begin WiFi connection
-  // gotIpEventHandler = WiFi.onStationModeGotIP([](const WiFiEventStationModeGotIP& event) {
-  //   Serial.print("Station connected, IP: ");
-  //   Serial.println(WiFi.localIP());
-  // });
+  EEPROM.begin(EEPROM_SIZE);
+  readStoredName();
 
-  // disconnectedEventHandler = WiFi.onStationModeDisconnected([](const WiFiEventStationModeDisconnected& event) {
-  //   Serial.println("Station disconnected");
-  // });
+  // Setup WiFi event handlers and begin WiFi connection
+  // WiFi.onEvent(WiFiEvent);
   WiFi.begin(ssid, password);
 
   // Start mqtt server
@@ -307,6 +455,7 @@ void loop() {
     data["espMacAddress"] = WiFi.macAddress();
   }
 
+  Serial.println("Running contoller");
   // Run if the controller is connected
   if (Ps3.isConnected()) {
     data["contollerStatus"] = "Connected";

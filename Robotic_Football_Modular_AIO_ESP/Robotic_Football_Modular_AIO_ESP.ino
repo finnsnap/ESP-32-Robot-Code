@@ -6,10 +6,10 @@
 #include <HTTPClient.h>
 #include <HTTPUpdate.h>
 
-#include <EEPROM.h>
+// #include <EEPROM.h>
+#include <Preferences.h>
 
-#include <AsyncMqttClient.h>
-
+#include "src/async-mqtt-client/src/AsyncMqttClient.h"
 #include "src/ArduinoJson/ArduinoJson-v6.16.1.h"
 
 
@@ -89,12 +89,12 @@ float exeTime;
 // Name and password of the WiFi network to connect to
 //const char* ssid = "RoboticFootballRasPi";
 //const char* password = "FootballRobots";
-const char* ssid = "PHILIP-LAPTOP";
-const char* password = "2X393,d9";
+const char* ssid = "PHILIP-DESKTOP";
+const char* password = "18o06(W6";
 WiFiClient wifiClient;
 //WiFiEventHandler gotIpEventHandler, disconnectedEventHandler;
 
-#define MQTT_HOST IPAddress(192, 168, 137, 211)
+#define MQTT_HOST IPAddress(192, 168, 137, 223)
 #define MQTT_PORT 1883
 
 AsyncMqttClient mqttClient;
@@ -103,6 +103,7 @@ TimerHandle_t wifiReconnectTimer;
 
 void connectToWifi() {
   Serial.println("Connecting to Wi-Fi...");
+  WiFi.setAutoReconnect(true);
   WiFi.begin(ssid, password);
 }
 
@@ -226,31 +227,52 @@ int battery = 0;
 
 #define EEPROM_SIZE 16
 
+Preferences preferences;
 
 void writeStoredName(String data) {
-  int stringSize = data.length();
-  if (stringSize <= 3){
-    for(int i = 0; i < stringSize; i++) {
-      EEPROM.write(i, data[i]);
-      // name[i] = data[i];
-    }
-    EEPROM.write(stringSize,'\0');   //Add termination null character
-    // name[stringSize] = '\0';
+  preferences.begin("RobotName");
+  preferences.putString("name", data);
+  preferences.end();
+  
+  
+  // int stringSize = data.length();
+  // if (stringSize <= 3){
+  //   for(int i = 0; i < stringSize; i++) {
+  //     EEPROM.write(i, data[i]);
+  //     // name[i] = data[i];
+  //   }
+  //   EEPROM.write(stringSize,'\0');   //Add termination null character
+  //   // name[stringSize] = '\0';
 
-    EEPROM.commit();
-  }
+  //   EEPROM.commit();
+  // }
 }
 
 void readStoredName() {
-  int len = 0;
-  unsigned char k;
-  k = EEPROM.read(0);
-  while(k != '\0' && len < EEPROM_SIZE) {     //Read until null character
-    k = EEPROM.read(len);
-    name[len] = k;
-    len++;
+  preferences.begin("RobotName", false);
+  String data = preferences.getString("name");
+  preferences.end();
+
+  Serial.print("Read name: ");
+  Serial.print(data);
+  Serial.print("\n");
+
+  if (data.length() == 3) {
+    strcpy(name, data.c_str());
   }
-  name[len]='\0';
+  Serial.print("Read name: ");
+  Serial.print(name);
+  Serial.print("\n");
+
+  // int len = 0;
+  // unsigned char k;
+  // k = EEPROM.read(0);
+  // while(k != '\0' && len < EEPROM_SIZE) {     //Read until null character
+  //   k = EEPROM.read(len);
+  //   name[len] = k;
+  //   len++;
+  // }
+  // name[len]='\0';
   
   for (int i = 0; i < 18; i++) { // Change 18 to make work with any length array
     if (strcmp(name, robotNames[i]) == 0) {
@@ -470,8 +492,8 @@ void setup() {// This is stuff for connecting the PS3 controller.
   ledsSetup();          //Setup the leds
   flashLeds();
   Serial.println("ESP32 starting up");
-
-  EEPROM.begin(EEPROM_SIZE);
+  String dadfa = "rK9";
+  writeStoredName(dadfa);
   readStoredName();
 
   mqttReconnectTimer = xTimerCreate("mqttTimer", pdMS_TO_TICKS(2000), pdFALSE, (void*)0, reinterpret_cast<TimerCallbackFunction_t>(connectToMqtt));
@@ -676,40 +698,32 @@ void loop() {
   now = millis();
 
 
-  // if (WiFi.status() != WL_CONNECTED) {
-  //   lastWiFiAttempt = now;
-  //   //Serial.println("WiFi Disconnected");
-    
-  //   // if wifi is down, try reconnecting every 30 seconds
-  //   // if ((WiFi.status() != WL_CONNECTED) && (millis() > 30000)) {
-  //   //   Serial.println("Reconnecting to WiFi...");
-  //   //   WiFi.disconnect();
-  //   //   WiFi.begin(SSID, PASS);
-  //   //   check_wifi = millis() + 30000;
-  //   // }
-  // } 
-  // else if (!mqttClient.connected()) {
-  //   //Serial.println("Trying to connect to MQTT");
-  //   lastMQTTAttempt = now;
-  //   reconnect();
-  // } 
-  // else if (now  - lastMsg > 200) {
-  //   lastMsg = now;
+  if (WiFi.status() != WL_CONNECTED) {
+    lastWiFiAttempt = now;
+    //Serial.println("WiFi Disconnected");
+  } 
+  else if (!mqttClient.connected()) {
+    //Serial.println("Trying to connect to MQTT");
+    lastMQTTAttempt = now;
+    //reconnect();
+  } 
+  else if (now  - lastMsg > 200) {
+    lastMsg = now;
 
-  //   data["robotNumber"] = name;
-  //   data["batteryLevel"] = "22";
+    data["robotNumber"] = name;
+    data["batteryLevel"] = "22";
 
-  //   size_t n = serializeJson(data, buffer);
+    size_t n = serializeJson(data, buffer);
 
-  //   // Print json data to serial port
-  //   serializeJson(data, Serial);
+    // Print json data to serial port
+    serializeJson(data, Serial);
 
-  //   if (mqttClient.publish("esp32/output", buffer, n)) {
-  //     Serial.print(" Success sending message\n");
-  //   }
-  //   else {
-  //     Serial.print(" Error sending message\n");
-  //   }
-  // }
+    if (mqttClient.publish("esp32/output", 2, false, buffer)) {
+      Serial.print(" Success sending message\n");
+    }
+    else {
+      Serial.print(" Error sending message\n");
+    }
+  }
 
 }

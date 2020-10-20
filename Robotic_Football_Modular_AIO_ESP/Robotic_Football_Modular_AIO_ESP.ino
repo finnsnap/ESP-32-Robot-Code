@@ -1,12 +1,6 @@
 #include "src/esp32-ps3-develop/src/Ps3Controller.h"
 #include "src/ESP32Servo/src/ESP32Servo.h"
 
-#include <WiFi.h>
-#include <WiFiClient.h>
-#include <HTTPClient.h>
-#include <HTTPUpdate.h>
-
-// #include <EEPROM.h>
 #include <Preferences.h>
 
 #include "Wireless/Wireless.cpp"
@@ -94,10 +88,10 @@ unsigned long lastMsg;
 // Name and password of the WiFi network to connect to
 //const char* ssid = "RoboticFootballRasPi";
 //const char* password = "FootballRobots";
-const char* ssid = "PHILIP-DESKTOP";
-const char* password = "18o06(W6";
+const char* ssid = "PHILIP-LAPTOP"; //"PHILIP-DESKTOP";
+const char* password = "2X393,d9"; //"18o06(W6"; 
 
-const char* mqttHost = "192.168.137.223";
+const char* mqttHost = "192.168.137.211";
 const uint16_t mqttPort = 1883;
 
 // Change name and contoller address for each robot
@@ -239,8 +233,10 @@ void loop() {
   #ifdef SHOW_EXECUTION_TIME
     exeTime = micros();
   #endif
+setData("contollerStatus", "dis  kj7uconnecte");
 
-  setData("tackleStatus", " ");
+  setData("tackleStatus", "not tackled");
+
   //data["tackleStatus"] = " ";
 
   // Run if the controller is connected
@@ -381,7 +377,9 @@ void loop() {
   else { // If the controller is not connected, LEDs blue and stop robot
     blue();
     driveStop();
-    setData("contollerStatus", "Disconnected");
+    //setData("contollerStatus", "disconnected ");
+    
+
     //data["contollerStatus"] = "Disconnected";
   } 
 

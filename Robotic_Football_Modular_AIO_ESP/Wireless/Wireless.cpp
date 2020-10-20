@@ -14,7 +14,7 @@ TimerHandle_t mqttReconnectTimer;
 TimerHandle_t wifiReconnectTimer;
 
 // JSON variables for sending data to webserver
-const int capacity = JSON_OBJECT_SIZE(6);
+const int capacity = JSON_OBJECT_SIZE(8);
 StaticJsonDocument<capacity> data;
 char buffer[256];
 
@@ -54,6 +54,7 @@ void connectToWifi(const char* ssid, const char* password) {
   WiFi.setAutoReconnect(true);
   WiFi.begin(ssid, password);
 }
+
 /**
  * Connect to the MQTT server
  */
@@ -184,17 +185,19 @@ void onMqttConnect(bool sessionPresent) {
   Serial.println("Connected to MQTT.");
   Serial.print("Session present: ");
   Serial.println(sessionPresent);
+  
   uint16_t packetIdSub = mqttClient.subscribe("esp32/input", 2);
   Serial.print("Subscribing at QoS 2, packetId: ");
   Serial.println(packetIdSub);
-  mqttClient.publish("esp32/output", 0, true, "test 1");
-  Serial.println("Publishing at QoS 0");
-  uint16_t packetIdPub1 = mqttClient.publish("esp32/output", 1, true, "test 2");
-  Serial.print("Publishing at QoS 1, packetId: ");
-  Serial.println(packetIdPub1);
-  uint16_t packetIdPub2 = mqttClient.publish("esp32/output", 2, true, "test 3");
-  Serial.print("Publishing at QoS 2, packetId: ");
-  Serial.println(packetIdPub2);
+  
+  // mqttClient.publish("esp32/output", 0, true, "test 1");
+  // Serial.println("Publishing at QoS 0");
+  // uint16_t packetIdPub1 = mqttClient.publish("esp32/output", 1, true, "test 2");
+  // Serial.print("Publishing at QoS 1, packetId: ");
+  // Serial.println(packetIdPub1);
+  // uint16_t packetIdPub2 = mqttClient.publish("esp32/output", 2, true, "test 3");
+  // Serial.print("Publishing at QoS 2, packetId: ");
+  // Serial.println(packetIdPub2);
 }
 
 /**
@@ -270,7 +273,7 @@ void onMqttMessage(char* topic, char* payload, AsyncMqttClientMessageProperties 
   if (String(topic) == "esp32/input") {
     //Serial.print("Changing output to ");
 
-    payload = messageTemp[0]; // Maybe change up to pointers to make more efficient?
+    //payload = messageTemp[0]; // Maybe change up to pointers to make more efficient?
     int index = 0;
     for (int i = 1; i < len; i++) if (messageTemp[i] == '-') index = i + 1;
     for (int i = index; i < len; i++) messageInput += messageTemp[i];
@@ -307,7 +310,6 @@ void onMqttPublish(uint16_t packetId) {
 }
 
 
-
 void wirelessSetup(const char* ssid, const char* password, const char* mqttHost, const uint16_t mqttPort, char* name) {
   mqttReconnectTimer = xTimerCreate("mqttTimer", pdMS_TO_TICKS(2000), pdFALSE, (void*)0, reinterpret_cast<TimerCallbackFunction_t>(connectToMqtt));
   wifiReconnectTimer = xTimerCreate("wifiTimer", pdMS_TO_TICKS(2000), pdFALSE, (void*)0, reinterpret_cast<TimerCallbackFunction_t>(connectToWifi));
@@ -324,37 +326,45 @@ void wirelessSetup(const char* ssid, const char* password, const char* mqttHost,
 
   connectToWifi(ssid, password);
 
-  robotName = name;
+  robotName = *name;
   data["robotNumber"] = name;
 }
 
 void setData(char* key, char* value) {
   data[key] = value;
+  Serial.print("\n\nKey: ");
+  Serial.print(key);
+  Serial.print("\nValue: ");
+  Serial.print(value);
+  Serial.print("\ndata value: ");
+  Serial.print((const char*) data[key]);
+  Serial.println();
 }
 
-void setData(char* key, const char* value) {
-  data[key] = value;
-}
+// void setData(char* key, const char* value) {
+//   data[key] = value;
+// }
 
-void setData(char* key, int value) {
-  data[key] = value;
+// void setData(char* key, int value) {
+//   data[key] = value;
 
-}
+// }
 
-void setData(char* key, byte* value) {
-  data[key] = value;
-}
+// void setData(char* key, byte* value) {
+//   data[key] = value;
+// }
 
 void sendData() {
 
-    data["batteryLevel"] = "22";
+    //data["batteryLevel"] = "22";
+    setData("batteryLevel", "22");
 
     size_t n = serializeJson(data, buffer);
 
     // Print json data to serial port
     serializeJson(data, Serial);
 
-    if (mqttClient.publish("esp32/output", 2, false, buffer) == 0) {
+    if (mqttClient.publish("esp32/output", 2, false, buffer, n) == 0) {
       Serial.print(" Error sending message\n");
     }
     else {

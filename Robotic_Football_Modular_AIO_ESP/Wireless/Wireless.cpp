@@ -1,13 +1,55 @@
-#include "src/async-mqtt-client/src/AsyncMqttClient.h"
+#include "../src/async-mqtt-client/src/AsyncMqttClient.h"
+#include "../src/ArduinoJson/ArduinoJson-v6.16.1.h"
+
 #include <WiFi.h>
 #include <WiFiClient.h>
 #include <HTTPClient.h>
 #include <HTTPUpdate.h>
 
+WiFiClient wifiClient;
+//WiFiEventHandler gotIpEventHandler, disconnectedEventHandler;
+
+AsyncMqttClient mqttClient;
+TimerHandle_t mqttReconnectTimer;
+TimerHandle_t wifiReconnectTimer;
+
+// JSON variables for sending data to webserver
+const int capacity = JSON_OBJECT_SIZE(6);
+StaticJsonDocument<capacity> data;
+char buffer[256];
+
+char robotName;
+
+/**
+ * Updates the esp32 code over http by connecting to a remote webserver
+ */
+void update() {
+  mqttClient.disconnect();
+  Serial.println("MQTT disconnected");
+
+  t_httpUpdate_return ret = httpUpdate.update(wifiClient, "http://192.168.137.211:8080/public/esp32.bin");
+  
+  switch (ret) {
+    case HTTP_UPDATE_FAILED:
+      Serial.printf("HTTP_UPDATE_FAILED Error (%d): %s\n", httpUpdate.getLastError(), httpUpdate.getLastErrorString().c_str());
+      break;
+
+    case HTTP_UPDATE_NO_UPDATES:
+      Serial.println("HTTP_UPDATE_NO_UPDATES");
+      break;
+
+    case HTTP_UPDATE_OK:
+      Serial.println("HTTP_UPDATE_OK");
+      break;
+  }
+}
+
+
+
 /**
  * Connect to WiFi
  */
-void connectToWifi() {
+void connectToWifi(const char* ssid, const char* password) {
   Serial.println("Connecting to Wi-Fi...");
   WiFi.setAutoReconnect(true);
   WiFi.begin(ssid, password);
@@ -31,6 +73,7 @@ void WiFiEvent(WiFiEvent_t event) {
         Serial.println("WiFi connected");
         Serial.println("IP address: ");
         Serial.println(WiFi.localIP());
+        data["espMacAddress"] = WiFi.macAddress();
         connectToMqtt();
         break;
     case SYSTEM_EVENT_STA_DISCONNECTED:
@@ -186,6 +229,7 @@ void onMqttUnsubscribe(uint16_t packetId) {
   Serial.println(packetId);
 }
 
+
 /**
  * Callback function for when a message is recieved from the MQTT server
  * @param topic The topic that the message was recieved on
@@ -218,7 +262,7 @@ void onMqttMessage(char* topic, char* payload, AsyncMqttClientMessageProperties 
   String messageTemp;
   String messageInput;
 
-  for (int i = 0; i < length; i++) {
+  for (int i = 0; i < len; i++) {
     Serial.print((char)payload[i]);
     messageTemp += (char)payload[i];
   }
@@ -228,25 +272,24 @@ void onMqttMessage(char* topic, char* payload, AsyncMqttClientMessageProperties 
 
     payload = messageTemp[0]; // Maybe change up to pointers to make more efficient?
     int index = 0;
-    for (int i = 1; i < length; i++) if (messageTemp[i] == '-') index = i + 1;
-    for (int i = index; i < length; i++) messageInput += messageTemp[i];
+    for (int i = 1; i < len; i++) if (messageTemp[i] == '-') index = i + 1;
+    for (int i = index; i < len; i++) messageInput += messageTemp[i];
     
     if(messageTemp == "p"){
       Serial.println("Reprogramming");
       update();
     }
     else if(messageCommand == 'r'){
-      readStoredName();
       Serial.print("Name read from EEPROM:");
-      Serial.print(name);
+      Serial.print(robotName);
       Serial.print("\n");
     }
-    else if(messageCommand == 'w'){
-      writeStoredName(messageInput);
-      Serial.print("Name written to EEPROM: ");
-      Serial.print(messageInput);
-      Serial.print("\n");
-    }
+    // else if(messageCommand == 'w'){
+    //   writeStoredName(messageInput);
+    //   Serial.print("Name written to EEPROM: ");
+    //   Serial.print(messageInput);
+    //   Serial.print("\n");
+    // }
     else {
       Serial.println("Invalid message");
     }
@@ -264,26 +307,57 @@ void onMqttPublish(uint16_t packetId) {
 }
 
 
-/**
- * Updates the esp32 code over http by connecting to a remote webserver
- */
-void update() {
-  mqttClient.disconnect();
-  Serial.println("MQTT disconnected");
 
-  t_httpUpdate_return ret = httpUpdate.update(wifiClient, "http://192.168.137.211:8080/public/esp32.bin");
-  
-  switch (ret) {
-    case HTTP_UPDATE_FAILED:
-      Serial.printf("HTTP_UPDATE_FAILED Error (%d): %s\n", httpUpdate.getLastError(), httpUpdate.getLastErrorString().c_str());
-      break;
+void wirelessSetup(const char* ssid, const char* password, const char* mqttHost, const uint16_t mqttPort, char* name) {
+  mqttReconnectTimer = xTimerCreate("mqttTimer", pdMS_TO_TICKS(2000), pdFALSE, (void*)0, reinterpret_cast<TimerCallbackFunction_t>(connectToMqtt));
+  wifiReconnectTimer = xTimerCreate("wifiTimer", pdMS_TO_TICKS(2000), pdFALSE, (void*)0, reinterpret_cast<TimerCallbackFunction_t>(connectToWifi));
 
-    case HTTP_UPDATE_NO_UPDATES:
-      Serial.println("HTTP_UPDATE_NO_UPDATES");
-      break;
+  WiFi.onEvent(WiFiEvent);
 
-    case HTTP_UPDATE_OK:
-      Serial.println("HTTP_UPDATE_OK");
-      break;
-  }
+  mqttClient.onConnect(onMqttConnect);
+  mqttClient.onDisconnect(onMqttDisconnect);
+  mqttClient.onSubscribe(onMqttSubscribe);
+  mqttClient.onUnsubscribe(onMqttUnsubscribe);
+  mqttClient.onMessage(onMqttMessage);
+  mqttClient.onPublish(onMqttPublish);
+  mqttClient.setServer(mqttHost, mqttPort);
+
+  connectToWifi(ssid, password);
+
+  robotName = name;
+  data["robotNumber"] = name;
+}
+
+void setData(char* key, char* value) {
+  data[key] = value;
+}
+
+void setData(char* key, const char* value) {
+  data[key] = value;
+}
+
+void setData(char* key, int value) {
+  data[key] = value;
+
+}
+
+void setData(char* key, byte* value) {
+  data[key] = value;
+}
+
+void sendData() {
+
+    data["batteryLevel"] = "22";
+
+    size_t n = serializeJson(data, buffer);
+
+    // Print json data to serial port
+    serializeJson(data, Serial);
+
+    if (mqttClient.publish("esp32/output", 2, false, buffer) == 0) {
+      Serial.print(" Error sending message\n");
+    }
+    else {
+      Serial.print(" Success sending message\n");
+    }
 }

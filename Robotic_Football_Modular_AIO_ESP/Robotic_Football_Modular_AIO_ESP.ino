@@ -84,17 +84,25 @@ unsigned long lastMsg;
 
 
 // Read battery is analog read pin 35
+// Contoller battery level
+int battery = 0;
 
-// Name and password of the WiFi network to connect to
-//const char* ssid = "RoboticFootballRasPi";
-//const char* password = "FootballRobots";
-const char* ssid = "PHILIP-LAPTOP"; //"PHILIP-DESKTOP";
-const char* password = "2X393,d9"; //"18o06(W6"; 
+#ifdef WIRELESS
+  // Name and password of the WiFi network to connect to
+  //const char* ssid = "RoboticFootballRasPi";
+  //const char* password = "FootballRobots";
+  const char* ssid = "PHILIP-LAPTOP"; //"PHILIP-DESKTOP";
+  const char* password = "2X393,d9"; //"18o06(W6"; 
 
-const char* mqttHost = "192.168.137.211";
-const uint16_t mqttPort = 1883;
+  const char* mqttHost = "192.168.137.211";
+  const uint16_t mqttPort = 1883;
+#endif
 
-// Change name and contoller address for each robot
+
+#define EEPROM_SIZE 16
+Preferences preferences;
+
+// Stores name of current robot
 char name[4];
 char* macaddress;
 
@@ -105,7 +113,7 @@ const char* robotNames[18] = {"r3",  "r7",  "r9",
                           "r75", "r81", "r82", 
                           "r85", "r88", "rK9"};
 
-char* macAddresses[18] = {"00:15:83:f3:e8:d8", "00:15:83:3d:0a:57", "00:1b:dc:0f:aa:58", 
+char* macAddressList[18] = {"00:15:83:f3:e8:d8", "00:15:83:3d:0a:57", "00:1b:dc:0f:aa:58", 
                              "00:1b:dc:0f:f3:59", "5c:f3:70:78:51:d6", "00:1b:dc:0f:d3:f1", 
                              "00:1b:dc:0f:f3:59", "00:15:83:f3:e0:09", "00:1b:dc:0f:dc:32", 
                              "00:1b:dc:0f:dc:3e", "00:1b:dc:0f:d3:e8", "5c:f3:70:78:51:d0", 
@@ -113,12 +121,6 @@ char* macAddresses[18] = {"00:15:83:f3:e8:d8", "00:15:83:3d:0a:57", "00:1b:dc:0f
                              "00:1b:dc:0f:dc:2d", "00:1b:dc:0f:e8:af", "00:15:83:f3:e8:e8"};
 
 
-// Contoller battery level
-int battery = 0;
-
-#define EEPROM_SIZE 16
-
-Preferences preferences;
 
 void writeStoredName(String data) {
   preferences.begin("RobotName");
@@ -132,10 +134,6 @@ void readStoredName() {
   String data = preferences.getString("name");
   preferences.end();
 
-  Serial.print("Read name: ");
-  Serial.print(data);
-  Serial.print("\n");
-
   if (data.length() == 3) {
     strcpy(name, data.c_str());
   }
@@ -146,7 +144,7 @@ void readStoredName() {
 
   for (int i = 0; i < 18; i++) { // Change 18 to make work with any length mac address array
     if (strcmp(name, robotNames[i]) == 0) {
-      macaddress = macAddresses[i];
+      macaddress = macAddressList[i];
       Serial.println(robotNames[i]);
       Serial.println(macaddress);
       break;
@@ -186,33 +184,42 @@ void onControllerConnect(){
     Serial.println("Controller is connected!");
 }
 
+int readJoystick(int8_t analogValue) {
+  // Read and map joystick value from -90 to 90
+  int value = map(Ps3.data.analog.stick.lx, -128, 127, -90, 90);
+  
+  // Deal with stickyness from joysticks
+  if (abs(value) < 8) value = 0;
+
+  return value;
+}
+
 
 
 void setup() {// This is stuff for connecting the PS3 controller.
   Serial.begin(115200);       //Begin Serial Communications
+  Serial.println("ESP32 starting up");
+  
   ledsSetup();          //Setup the leds
   flashLeds();
-  Serial.println("ESP32 starting up");
+
   // String dadfa = "rK9";
   // writeStoredName(dadfa);
+
   readStoredName();
 
-  #ifdef WIRELESS
-    wirelessSetup(ssid, password, mqttHost, mqttPort, name);
-  #endif
-
-// Add check for valid mac address
+// Add check for valid contoller mac address
 
   // Attached the contoller connect function to connection callback and start contoller connection
   Ps3.attachOnConnect(onControllerConnect);
   Ps3.begin(macaddress);
-  // while(!Ps3.isConnected()){
-  //   Serial.println("Controller not connected");
-  //   blue();
-  // }
   
   //Setup the drive train, peripherals, tackle sensor, and changes leds to green once complete
   driveSetup(motorType);
+
+  #ifdef WIRELESS
+    wirelessSetup(ssid, password, mqttHost, mqttPort, name);
+  #endif
 
   #ifdef PERIPHERAL
     peripheralSetup();
@@ -233,16 +240,13 @@ void loop() {
   #ifdef SHOW_EXECUTION_TIME
     exeTime = micros();
   #endif
-setData("contollerStatus", "dis  kj7uconnecte");
 
-  setData("tackleStatus", "not tackled");
-
-  //data["tackleStatus"] = " ";
+  char* contollerStatus;
+  char* tackleStatus = " ";
 
   // Run if the controller is connected
   if (Ps3.isConnected()) {
-    setData("contollerSStatus", "Connected");
-    //data["contollerStatus"] = "Connected";
+    contollerStatus = "Connected";    
     
     // if( battery != Ps3.data.status.battery ){
     //     battery = Ps3.data.status.battery;
@@ -264,16 +268,10 @@ setData("contollerStatus", "dis  kj7uconnecte");
 
     //====================Get Controller Input=================================
     // Reads and maps joystick values from -90 to 90
-    leftX = map(Ps3.data.analog.stick.lx, -128, 127, -90, 90);
-    leftY = map(Ps3.data.analog.stick.ly, -128, 127, -90, 90);
-    rightX = map(Ps3.data.analog.stick.rx, -128, 127, -90, 90);
-    rightY = map(Ps3.data.analog.stick.ry, -128, 127, -90, 90);
-    
-    // Deals with stickness from joysticks
-    if (abs(leftX) < 8) leftX = 0;
-    if (abs(leftY) < 8) leftY = 0;
-    if (abs(rightX) < 8) rightX = 0;
-    if (abs(rightY) < 8) rightY = 0;
+    leftX = readJoystick(Ps3.data.analog.stick.lx);
+    leftY = readJoystick(Ps3.data.analog.stick.ly);
+    rightX = readJoystick(Ps3.data.analog.stick.rx);
+    rightY = readJoystick(Ps3.data.analog.stick.ry);
     
     #ifdef SHOW_CONTROLLER_INPUT
       Serial.print(leftX);    
@@ -289,43 +287,39 @@ setData("contollerStatus", "dis  kj7uconnecte");
     //====================Specify the handicap=================================
     //Toggle in and out of kidsmode
     if (Ps3.data.button.start) {
-      if (kidsMode == true) {
+      if (kidsMode) {
         kidsMode = false;
-        handicap = 3;
         ps3SetLed(5);     // ON OFF OFF ON          
         rumbleContoller(5, 255, 5, 255);      // vibrate both, then left, then right
-      } else if (kidsMode == false) {
+      } 
+      else {
         kidsMode = true;
-        handicap = 7;
         ps3SetLed(1);     // OFF OFF OFF ON
         rumbleContoller(5, 255, 5, 255);      // vibrate both, then left, then right
       }
     }
 
-    if (kidsMode == false) {
+    if (kidsMode) handicap = 7;
+    else {
       // Press R2 to boost
-      if (Ps3.data.button.r2) {
-        handicap = 1;
-      }
+      if (Ps3.data.button.r2) handicap = 1;
+
       // Press L2 to slow down
-      else if (Ps3.data.button.l2) {
-        handicap = 6;
-      } 
+      else if (Ps3.data.button.l2) handicap = 6;
+      
       // Sets default handicap
-      else {
-        handicap = 3;
-      }
+      else handicap = 3;
     }
 
     //===============================Adjust motors=============================
-    if (Ps3.data.button.left){
+    if (Ps3.data.button.left && Ps3.data.button.select){
       correctMotor(1);
-      Serial.println("Left button clicked");
+      Serial.println("Left button pressed");
       rumbleContoller(0, 0, 5, 255);
     }
-    if (Ps3.data.button.right){
+    if (Ps3.data.button.right && Ps3.data.button.select){
       correctMotor(-1);
-      Serial.println("Right button clicked");
+      Serial.println("Right button pressed");
       rumbleContoller(5, 255, 0, 0);
     }
 
@@ -336,35 +330,28 @@ setData("contollerStatus", "dis  kj7uconnecte");
       // for the if statement for whether or not
       // tackle is enabled. cool stuff
       if (Ps3.data.button.left) {
-        if (stayTackled == true) {
-          stayTackled = false;
-        } 
-        else {
-          stayTackled = true;
-        }
+        stayTackled = !stayTackled;
         rumbleContoller(30, 255, 30, 255);
       }
-      if (!digitalRead(TACKLE_INPUT))
-      {
+
+      if (!digitalRead(TACKLE_INPUT)) {
         red();
-        setData("tackleStatus", "Tackled");
-        //data["tackleStatus"] = "Tackled";
+        tackleStatus = "Tackled";
+
         if (!hasIndicated) {
           rumbleContoller(10, 255, 10, 255);
           hasIndicated = true;
         }
       }
-      else
-      {
+      else {
         if (stayTackled == false) {
           hasIndicated = false;
           green();
-          setData("tackleStatus", "Not tackled");
-          //data["tackleStatus"] = "Not tackled";
+          tackleStatus = "Not tackled";
         }
       }
-
     #endif
+  
     //===============================================================================================
 
     // Drives the robot according to joystick input
@@ -377,23 +364,20 @@ setData("contollerStatus", "dis  kj7uconnecte");
   else { // If the controller is not connected, LEDs blue and stop robot
     blue();
     driveStop();
-    //setData("contollerStatus", "disconnected ");
-    
-
-    //data["contollerStatus"] = "Disconnected";
+    contollerStatus = "Disconnected";
   } 
+
+  #ifdef WIRELESS
+    // Stores the current time
+    now = millis();
+    if (now  - lastMsg > 200) {
+      lastMsg = now;
+      sendRobotData(tackleStatus, contollerStatus);
+    }
+  #endif
 
   #ifdef SHOW_EXECUTION_TIME
     Serial.print("Exe exeTime: ");
     Serial.println(micros() - exeTime);
   #endif
-
-  // Stores the current time
-  now = millis();
-
-
-  if (now  - lastMsg > 200) {
-    lastMsg = now;
-    sendData();
-  }
 }

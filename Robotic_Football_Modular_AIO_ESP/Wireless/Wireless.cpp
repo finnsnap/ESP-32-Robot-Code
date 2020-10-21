@@ -13,12 +13,9 @@ AsyncMqttClient mqttClient;
 TimerHandle_t mqttReconnectTimer;
 TimerHandle_t wifiReconnectTimer;
 
-// JSON variables for sending data to webserver
-const int capacity = JSON_OBJECT_SIZE(8);
-StaticJsonDocument<capacity> data;
-char buffer[256];
 
-char robotName;
+char robotName[4];
+char espMacAddress[18];
 
 /**
  * Updates the esp32 code over http by connecting to a remote webserver
@@ -74,7 +71,6 @@ void WiFiEvent(WiFiEvent_t event) {
         Serial.println("WiFi connected");
         Serial.println("IP address: ");
         Serial.println(WiFi.localIP());
-        data["espMacAddress"] = WiFi.macAddress();
         connectToMqtt();
         break;
     case SYSTEM_EVENT_STA_DISCONNECTED:
@@ -325,49 +321,38 @@ void wirelessSetup(const char* ssid, const char* password, const char* mqttHost,
   mqttClient.setServer(mqttHost, mqttPort);
 
   connectToWifi(ssid, password);
-
-  robotName = *name;
-  data["robotNumber"] = name;
+  
+  Serial.print("\n\nMAC ADDRESS: ");
+  Serial.println(WiFi.macAddress().c_str());
+  strcpy(espMacAddress, WiFi.macAddress().c_str());
+  strcpy(robotName, name);
 }
 
-void setData(char* key, char* value) {
-  data[key] = value;
-  Serial.print("\n\nKey: ");
-  Serial.print(key);
-  Serial.print("\nValue: ");
-  Serial.print(value);
-  Serial.print("\ndata value: ");
-  Serial.print((const char*) data[key]);
-  Serial.println();
-}
 
-// void setData(char* key, const char* value) {
-//   data[key] = value;
-// }
+void sendRobotData(char* tackleStatus, char* contollerStatus) {
+  // JSON variables for sending data to webserver
+  const int capacity = JSON_OBJECT_SIZE(8);
+  StaticJsonDocument<capacity> data;
+  char buffer[256];
 
-// void setData(char* key, int value) {
-//   data[key] = value;
+  // From initilization
+  data["robotNumber"] = robotName;
+  data["espMacAddress"] = espMacAddress;
 
-// }
+  // Stuff from function input
+  data["batteryLevel"] =  "22";
+  data["tackleStatus"] = tackleStatus;
+  data["contollerStatus"] = contollerStatus;
 
-// void setData(char* key, byte* value) {
-//   data[key] = value;
-// }
+  size_t n = serializeJson(data, buffer);
 
-void sendData() {
+  // Print json data to serial port
+  serializeJson(data, Serial);
 
-    //data["batteryLevel"] = "22";
-    setData("batteryLevel", "22");
-
-    size_t n = serializeJson(data, buffer);
-
-    // Print json data to serial port
-    serializeJson(data, Serial);
-
-    if (mqttClient.publish("esp32/output", 2, false, buffer, n) == 0) {
-      Serial.print(" Error sending message\n");
-    }
-    else {
-      Serial.print(" Success sending message\n");
-    }
+  if (mqttClient.publish("esp32/output", 2, false, buffer, n) == 0) {
+    Serial.print(" Error sending message\n");
+  }
+  else {
+    Serial.print(" Success sending message\n");
+  }
 }

@@ -7,12 +7,10 @@
 #include <HTTPUpdate.h>
 
 WiFiClient wifiClient;
-//WiFiEventHandler gotIpEventHandler, disconnectedEventHandler;
 
 AsyncMqttClient mqttClient;
 TimerHandle_t mqttReconnectTimer;
 TimerHandle_t wifiReconnectTimer;
-
 
 char robotName[4];
 char espMacAddress[18];
@@ -322,7 +320,7 @@ void wirelessSetup(const char* ssid, const char* password, const char* mqttHost,
 
   connectToWifi(ssid, password);
   
-  Serial.print("\n\nMAC ADDRESS: ");
+  Serial.print("\nMAC ADDRESS: ");
   Serial.println(WiFi.macAddress().c_str());
   strcpy(espMacAddress, WiFi.macAddress().c_str());
   strcpy(robotName, name);
@@ -330,29 +328,36 @@ void wirelessSetup(const char* ssid, const char* password, const char* mqttHost,
 
 
 void sendRobotData(char* tackleStatus, char* contollerStatus) {
-  // JSON variables for sending data to webserver
-  const int capacity = JSON_OBJECT_SIZE(8);
-  StaticJsonDocument<capacity> data;
-  char buffer[256];
+  if(WiFi.status() == WL_CONNECTED) {
+    // JSON variables for sending data to webserver
+    const int capacity = JSON_OBJECT_SIZE(8);
+    StaticJsonDocument<capacity> data;
+    char buffer[256];
 
-  // From initilization
-  data["robotNumber"] = robotName;
-  data["espMacAddress"] = espMacAddress;
+    // From initilization
+    data["robotNumber"] = robotName;
+    data["espMacAddress"] = espMacAddress;
 
-  // Stuff from function input
-  data["batteryLevel"] =  "22";
-  data["tackleStatus"] = tackleStatus;
-  data["contollerStatus"] = contollerStatus;
+    // Stuff from function input
+    data["batteryLevel"] =  "22";
+    data["tackleStatus"] = tackleStatus;
+    data["contollerStatus"] = contollerStatus;
 
-  size_t n = serializeJson(data, buffer);
+    // Serialize JSON into the buffer array
+    size_t n = serializeJson(data, buffer);
 
-  // Print json data to serial port
-  serializeJson(data, Serial);
+    // Print json data to serial port
+    serializeJson(data, Serial);
 
-  if (mqttClient.publish("esp32/output", 2, false, buffer, n) == 0) {
-    Serial.print(" Error sending message\n");
+    if (mqttClient.publish("esp32/output", 2, false, buffer, n) == 0) {
+      Serial.print(" Error sending message\n");
+    }
+    else {
+      Serial.print(" Success sending message\n");
+    }
   }
   else {
-    Serial.print(" Success sending message\n");
+    Serial.println("Failed to send robot data. WiFi disconnected");
   }
+  
 }

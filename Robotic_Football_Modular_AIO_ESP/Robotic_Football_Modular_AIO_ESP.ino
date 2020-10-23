@@ -89,12 +89,12 @@ int battery = 0;
 
 #ifdef WIRELESS
   // Name and password of the WiFi network to connect to
-  //const char* ssid = "RoboticFootballRasPi";
-  //const char* password = "FootballRobots";
-  const char* ssid = "PHILIP-LAPTOP"; //"PHILIP-DESKTOP";
-  const char* password = "2X393,d9"; //"18o06(W6"; 
+  const char* ssid = "RoboticFootballRasPi";
+  const char* password = "FootballRobots";
+  //const char* ssid = "PHILIP-LAPTOP"; //"PHILIP-DESKTOP";
+  //const char* password = "2X393,d9"; //"18o06(W6"; 
 
-  const char* mqttHost = "192.168.137.211";
+  const char* mqttHost = "192.168.4.1";
   const uint16_t mqttPort = 1883;
 #endif
 

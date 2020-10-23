@@ -22,7 +22,7 @@ void update() {
   mqttClient.disconnect();
   Serial.println("MQTT disconnected");
 
-  t_httpUpdate_return ret = httpUpdate.update(wifiClient, "http://192.168.137.211:8080/public/esp32.bin");
+  t_httpUpdate_return ret = httpUpdate.update(wifiClient, "http://192.168.4.1:8080/public/esp32.bin");
   
   switch (ret) {
     case HTTP_UPDATE_FAILED:
@@ -47,6 +47,7 @@ void update() {
 void connectToWifi(const char* ssid, const char* password) {
   Serial.println("Connecting to Wi-Fi...");
   WiFi.setAutoReconnect(true);
+  WiFi.persistent(false);
   WiFi.begin(ssid, password);
 }
 
@@ -328,7 +329,7 @@ void wirelessSetup(const char* ssid, const char* password, const char* mqttHost,
 
 
 void sendRobotData(char* tackleStatus, char* contollerStatus) {
-  if(WiFi.status() == WL_CONNECTED) {
+  if(WiFi.status() == WL_CONNECTED && mqttClient.connected()) {
     // JSON variables for sending data to webserver
     const int capacity = JSON_OBJECT_SIZE(8);
     StaticJsonDocument<capacity> data;
@@ -356,8 +357,15 @@ void sendRobotData(char* tackleStatus, char* contollerStatus) {
       Serial.print(" Success sending message\n");
     }
   }
-  else {
+  else if(WiFi.status() != WL_CONNECTED) {
     Serial.println("Failed to send robot data. WiFi disconnected");
+  }
+  else if(!mqttClient.connected()) {
+    Serial.println("Failed to send robot data. MQTT disconnected");
+  }
+  else {
+    Serial.println("Failed to send robot data.");
+
   }
   
 }

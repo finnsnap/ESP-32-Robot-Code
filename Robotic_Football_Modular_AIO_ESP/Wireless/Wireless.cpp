@@ -15,6 +15,9 @@ TimerHandle_t wifiReconnectTimer;
 char robotName[4];
 char espMacAddress[18];
 
+const char* storedSsid;
+const char* storedPassword;
+
 /**
  * Updates the esp32 code over http by connecting to a remote webserver
  */
@@ -44,11 +47,12 @@ void update() {
 /**
  * Connect to WiFi
  */
-void connectToWifi(const char* ssid, const char* password) {
+void connectToWifi() {
   Serial.println("Connecting to Wi-Fi...");
-  WiFi.setAutoReconnect(true);
-  WiFi.persistent(false);
-  WiFi.begin(ssid, password);
+  WiFi.disconnect();
+  // WiFi.setAutoReconnect(true);
+  // WiFi.persistent(false);
+  WiFi.begin(storedSsid, storedPassword);
 }
 
 /**
@@ -319,7 +323,10 @@ void wirelessSetup(const char* ssid, const char* password, const char* mqttHost,
   mqttClient.onPublish(onMqttPublish);
   mqttClient.setServer(mqttHost, mqttPort);
 
-  connectToWifi(ssid, password);
+  storedSsid = ssid;
+  storedPassword = password;
+
+  connectToWifi();
   
   Serial.print("\nMAC ADDRESS: ");
   Serial.println(WiFi.macAddress().c_str());

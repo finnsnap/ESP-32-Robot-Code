@@ -4,6 +4,7 @@
 #include <Preferences.h>
 
 #include "Wireless/Wireless.cpp"
+#define WIRELESS
 
 //===========Uncomment a LED===========================
 #include "Leds/Leds.cpp"
@@ -76,11 +77,6 @@ ps3_cmd_t cmd;
 unsigned long exeTime;
 unsigned long now;
 unsigned long lastMsg;
-
-
-
-#define WIRELESS
-
 
 
 // Read battery is analog read pin 35
@@ -186,7 +182,7 @@ void onControllerConnect(){
 
 int readJoystick(int8_t analogValue) {
   // Read and map joystick value from -90 to 90
-  int value = map(Ps3.data.analog.stick.lx, -128, 127, -90, 90);
+  int value = map(analogValue, -128, 127, -90, 90);
   
   // Deal with stickyness from joysticks
   if (abs(value) < 8) value = 0;
@@ -203,7 +199,7 @@ void setup() {// This is stuff for connecting the PS3 controller.
   ledsSetup();          //Setup the leds
   flashLeds();
 
-  // String dadfa = "rK9";
+  // String dadfa = "r42";
   // writeStoredName(dadfa);
 
   readStoredName();
@@ -246,7 +242,8 @@ void loop() {
 
   // Run if the controller is connected
   if (Ps3.isConnected()) {
-    contollerStatus = "Connected";    
+    contollerStatus = "Connected";   
+    Serial.println("Contoller connected"); 
     
     // if( battery != Ps3.data.status.battery ){
     //     battery = Ps3.data.status.battery;
@@ -365,6 +362,7 @@ void loop() {
     blue();
     driveStop();
     contollerStatus = "Disconnected";
+    Serial.println("Controller Disconnected");
   } 
 
   #ifdef WIRELESS

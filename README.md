@@ -74,3 +74,4 @@ This is a list of useful links and tutorials that were used.
 ## TODO
 * Replace EEPROM with esp32-Preferences
 * Replace pubsubclient with async-mqtt-client
+* Make IP depend on robot name. Right now all IP are the same so they will conflict

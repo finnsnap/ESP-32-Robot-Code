@@ -85,10 +85,10 @@ int battery = 0;
 
 #ifdef WIRELESS
   // Name and password of the WiFi network to connect to
-  const char* ssid = "RoboticFootballRasPi";
-  const char* password = "FootballRobots";
-  //const char* ssid = "PHILIP-LAPTOP"; //"PHILIP-DESKTOP";
-  //const char* password = "2X393,d9"; //"18o06(W6"; 
+  //const char* ssid = "RoboticFootballRasPi";
+  //const char* password = "FootballRobots";
+  const char* ssid = "PHILIP-LAPTOP"; //"PHILIP-DESKTOP";
+  const char* password = "2X393,d9"; //"18o06(W6"; 
 
   const char* mqttHost = "192.168.4.1";
   const uint16_t mqttPort = 1883;
@@ -162,7 +162,7 @@ void rumbleContoller(uint8_t rightDuration, uint8_t rightPower, uint8_t leftDura
     cmd.rumble_right_intensity = rightPower;
     cmd.rumble_left_intensity = leftPower;
     cmd.rumble_left_duration = leftDuration;
-
+    cmd.led1 = 1; // Look in the library at cmd struct for some cool bit-fields stuff
     ps3Cmd(cmd);
 }
 
@@ -174,7 +174,6 @@ void onControllerConnect(){
     if (newconnect == 0) {
       rumbleContoller(50, 255, 50, 255);
       newconnect++;
-      ps3SetLed(1);
     }
 
     Serial.println("Controller is connected!");
@@ -199,7 +198,7 @@ void setup() {// This is stuff for connecting the PS3 controller.
   ledsSetup();          //Setup the leds
   flashLeds();
 
-  // String dadfa = "r42";
+  // String dadfa = "rK9";
   // writeStoredName(dadfa);
 
   readStoredName();
@@ -243,7 +242,7 @@ void loop() {
   // Run if the controller is connected
   if (Ps3.isConnected()) {
     contollerStatus = "Connected";   
-    Serial.println("Contoller connected"); 
+    //Serial.println("Contoller connected"); 
     
     // if( battery != Ps3.data.status.battery ){
     //     battery = Ps3.data.status.battery;
@@ -362,7 +361,7 @@ void loop() {
     blue();
     driveStop();
     contollerStatus = "Disconnected";
-    Serial.println("Controller Disconnected");
+    //Serial.println("Controller Disconnected");
   } 
 
   #ifdef WIRELESS

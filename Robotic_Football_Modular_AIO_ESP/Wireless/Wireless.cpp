@@ -51,7 +51,14 @@ void connectToWifi() {
   Serial.println("Connecting to Wi-Fi...");
   WiFi.disconnect();
   // WiFi.setAutoReconnect(true);
-  // WiFi.persistent(false);
+  /* See https://www.bakke.online/index.php/2017/05/22/reducing-wifi-power-consumption-on-esp8266-part-3/ for explanation */
+  IPAddress ip(192, 168, 0, 1);
+  IPAddress gateway(192, 168, 4, 1);
+  IPAddress subnet(255, 255, 255, 0);
+
+  WiFi.persistent(false);
+  WiFi.mode(WIFI_STA);
+  WiFi.config(ip, gateway, subnet);
   WiFi.begin(storedSsid, storedPassword);
 }
 

@@ -1,25 +1,68 @@
 Robotic-Football-All-In-One
 =====
 
-This is the single-file code for the robotic football team. The design philosophy behind this project is to include all of the code for all of the robots inside a single file to make it easy to keep track of the different robots and their shared abilities. The abilities of the robot to be programmed are then chosen from a list of define statements at the top of the file, like so:
+
+<!-- GETTING STARTED -->
+## Getting Started
+
+To get a local copy up and running follow these simple steps.
+
+### Prerequisites
+
+You need to add the ESP32 board in the Ardunio IDE before you can compile and upload this code. The link below is a tutorial on how to do this.
+
+[Installing the ESP32 Board in Arduino IDE (Windows, Mac OS X, Linux)](https://randomnerdtutorials.com/installing-the-esp32-board-in-arduino-ide-windows-instructions/)
+
+
+### Installation
+
+1. Clone the repo
+```sh
+git clone https://github.com/finnsnap/ESP-32-Robot-Code.git
+```
+2. Open the [Robotic_Football_Modular_AIO_ESP.ino](Robotic_Football_Modular_AIO_ESP/Robotic_Football_Modular_AIO_ESP.ino) file in the Arduino IDE
+
+3. Select the **ESP32 Dev Module** in the **Tools > Board** menu
+
+4. Select the COM port that the ESP32 is connected to in the **Tools > Port** menu
+
+4. Upload the code to the board
+
+
+### Editing the Code
+
+This is the code for the robotic football team. The code is structured to include only the necessary files to enable different configurations of a robot to be made. This allows different robots with differnt abilities to easily be programmed. The abilities of the robot to be programmed are chosen from a list of define statements at the top of the file, like so:
 
 ````c++
-//#define BASIC_DRIVETRAIN
-#define OMNIWHEEL_DRIVETRAIN
-//#define CENTER_PERIPHERALS
-#define QB_PERIPHERALS
-//#define KICKER_PERIPHERALS
-//#define RECEIVER_PERIPHERALS
-#define LED_STRIP
+//===========Uncomment a LED===========================
+#include "Leds/Leds.cpp"
+//#include "Leds/OldLeds.cpp"
+
+//===========Uncomment a drive train===================
+//#include "DriveTrains/BasicDrive.cpp"
+//#include "DriveTrains/CenterDrive.cpp"
+#include "DriveTrains/SquareOmniDrive.cpp"
+
+//===========Uncomment for tackle sensor===============
 #define TACKLE
-#define ROTATION_LOCK
+
+//===========Uncomment to choose a Position============
+//#define WR
+//#define Center
+#define QB
+//#define Kicker
+
+//===========Uncomment if not using bag motors=========
+//#define OldMotors
 ````
-This example would create a robot that uses an omniwheel drivetrain (specifically our quarterback), with the led strip and tackle sensor enabled. This robot is also using the new rotation locking compass. At the end of the file are a list of error cases that the compile goes through to make sure no incompatable options are shown.
+This example would create a robot that uses an omniwheel drivetrain (specifically our quarterback), with the led strip and tackle sensor enabled.
+
+
 
 #### Useful Libraries
 ---
-1. (PS3 Integration) [USB HostShield 2.0](https://github.com/felis/USB_Host_Shield_2.0)
-2. (Omniwheel Rotation Locking) [Adafruit BNO055](https://github.com/adafruit/Adafruit_BNO055)
+1. (PS3 Contoller) [esp32-ps3](https://github.com/jvpernis/esp32-ps3)
+2. (Motor Library) [ESP32Servo](https://github.com/madhephaestus/ESP32Servo)
 
 #### Controls
 ---
@@ -28,9 +71,11 @@ This example would create a robot that uses an omniwheel drivetrain (specificall
     - _Left/Right Right Joystick_ - Turning
     - _R2_ - activates "boost"
     - _Start_ - Puts robot in "kids mode". The speed is reduced, boost is disabled, and the leds will change
-    - _Select _- Calibration mode - disables drivetrain while changes are made
+    - _Select_ and _Left/Right D-Pad_ - Corrects the robot for drift in the left or right direction
+    <!-- - _Select _- Calibration mode - disables drivetrain while changes are made
       - _Up/Down D-Pad_ - compensates for drag left or right
-      - _Select_ - exit Calibration Mode to regular drive mode
+      - _Select_ - exit Calibration Mode to regular drive mode -->
+
   - **Center**
     - Center currently uses basic drivetrain
     - _TRIANGLE_ - raise the center release servo
@@ -55,6 +100,10 @@ This example would create a robot that uses an omniwheel drivetrain (specificall
     - _CROSS_ - kick
     - _TRIANGLE_ - reload
 
+
+
+
+
 <!-- USEFUL LINKS -->
 ## Useful Links
 
@@ -69,9 +118,11 @@ This is a list of useful links and tutorials that were used.
 * [How to use ArduinoJson with PubSubClient?](https://arduinojson.org/v6/how-to/use-arduinojson-with-pubsubclient/)
 * [WiFiClientEvents.ino](https://github.com/espressif/arduino-esp32/blob/master/libraries/WiFi/examples/WiFiClientEvents/WiFiClientEvents.ino)
 * [async-mqtt-client](https://github.com/marvinroger/async-mqtt-client)
+* [esp32 low power wifi](https://www.bakke.online/index.php/2017/05/22/reducing-wifi-power-consumption-on-esp8266-part-3/)
 
 
 ## TODO
-* Replace EEPROM with esp32-Preferences
-* Replace pubsubclient with async-mqtt-client
+* ~~Replace EEPROM with esp32-Preferences~~
+* ~~Replace pubsubclient with async-mqtt-client~~
 * Make IP depend on robot name. Right now all IP are the same so they will conflict
+* Fix esp32 crashing when there is no robot name stored

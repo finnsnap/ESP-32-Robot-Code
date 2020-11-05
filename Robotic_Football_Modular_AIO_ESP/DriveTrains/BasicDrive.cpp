@@ -38,41 +38,47 @@ void driveSetup(int motorType) {
  */
 void driveCtrl(int handicap, int leftX, int leftY, int rightX, int rightY)
 {
-  if ((rightY == 0) && (leftX == 0))
+  if (leftY == 0 && rightX == 0) //&& (rightX == 0) && (rightY == 0))
   { /* If no input this should ensure that the motors actually stop 
       and skip the rest of the drive function 
       */
     leftMotor.write(90);
     rightMotor.write(90);
-  }
 
-  if (drive < leftY) drive++;    // Accelerates
-  else if (drive > leftY) drive--;   // Decelerates
-
-  if (turn < rightX) turn++;    //Turns left?
-  else if (turn > rightX) turn--;   //Turns right?
-
-  // These are the final variables that decide motor speed
-  throttleL = motorDirection * ((drive - turn) / handicap);
-  throttleR = -1 * motorDirection * ((drive + turn) / handicap) + motorCorrection;
-
-  // Limiting the max value of the throttle
-  if (throttleL > MAX_DRIVE) throttleL = MAX_DRIVE;
-  else if (throttleL < -MAX_DRIVE) throttleL = -MAX_DRIVE;
-  if (throttleR > MAX_DRIVE) throttleR = MAX_DRIVE;
-  else if (throttleR < -MAX_DRIVE) throttleR = -MAX_DRIVE;
-
-  // Sending values to the speed controllers
-  leftMotor.write(throttleL + 90);
-  rightMotor.write(throttleR + 90);
-  
-  #ifdef SHOW_DEBUG_INFO
-    Serial.print("Throttle Left: ");
-    Serial.print(throttleL);
-    Serial.print("Throttle Right: ");
-    Serial.print(throttleR);
+    Serial.print("No drive");
     Serial.print("\t");
-  #endif
+  }
+  else {
+    if (drive < leftY) drive++;    // Accelerates
+    else if (drive > leftY) drive--;   // Decelerates
+
+    if (turn < rightX) turn++;    //Turns left?
+    else if (turn > rightX) turn--;   //Turns right?
+
+    // These are the final variables that decide motor speed
+    throttleL = motorDirection * ((drive - turn) / handicap);
+    throttleR = -1 * motorDirection * ((drive + turn) / handicap) + motorCorrection;
+
+    // Limiting the max value of the throttle
+    if (throttleL > MAX_DRIVE) throttleL = MAX_DRIVE;
+    else if (throttleL < -MAX_DRIVE) throttleL = -MAX_DRIVE;
+    if (throttleR > MAX_DRIVE) throttleR = MAX_DRIVE;
+    else if (throttleR < -MAX_DRIVE) throttleR = -MAX_DRIVE;
+
+    // Sending values to the speed controllers
+    leftMotor.write(throttleL + 90);
+    rightMotor.write(throttleR + 90);
+    
+    #ifdef SHOW_DEBUG_INFO
+      Serial.print("Throttle Left: ");
+      Serial.print(throttleL);
+      Serial.print("Throttle Right: ");
+      Serial.print(throttleR);
+      Serial.print("\t");
+    #endif
+  }
+  
+
 }
 
 /**

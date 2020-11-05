@@ -3,8 +3,8 @@
 
 #include <Preferences.h>
 
-#include "Wireless/Wireless.cpp"
-#define WIRELESS
+//#include "Wireless/Wireless.cpp"
+//#define WIRELESS
 
 //===========Uncomment a LED===========================
 #include "Leds/Leds.cpp"
@@ -16,7 +16,7 @@
 //#include "DriveTrains/SquareOmniDrive.cpp"
 
 //===========Uncomment for tackle sensor===============
-#define TACKLE
+//#define TACKLE
 
 //===========Uncomment to choose a Position============
 //#define WR
@@ -67,28 +67,29 @@ bool hasIndicated = false;
 bool stayTackled = false;
 
 // Default handicap is 3 with no kids mode
-int handicap = 3;       
+uint8_t handicap = 3;       
 bool kidsMode = false;
 
 // Define joystick variables and other useful variables
-int leftX, leftY, rightX, rightY;
-int newconnect = 0;
+uint8_t leftX, leftY, rightX, rightY;
+bool newconnect = true;
 ps3_cmd_t cmd;
-unsigned long exeTime;
-unsigned long now;
-unsigned long lastMsg;
+unsigned long exeTime, now, lastMsg, lastBatteryRead;
 
 
 // Read battery is analog read pin 35
+uint8_t batteryPin = 35;
+const int robotBattery = 0;
+
 // Contoller battery level
 int battery = 0;
 
 #ifdef WIRELESS
   // Name and password of the WiFi network to connect to
-  //const char* ssid = "RoboticFootballRasPi";
-  //const char* password = "FootballRobots";
-  const char* ssid = "PHILIP-LAPTOP"; //"PHILIP-DESKTOP";
-  const char* password = "2X393,d9"; //"18o06(W6"; 
+  const char* ssid = "RoboticFootballRasPi";
+  const char* password = "FootballRobots";
+  //const char* ssid = "PHILIP-LAPTOP"; //"PHILIP-DESKTOP";
+  //const char* password = "2X393,d9"; //"18o06(W6"; 
 
   const char* mqttHost = "192.168.4.1";
   const uint16_t mqttPort = 1883;
@@ -171,16 +172,16 @@ void rumbleContoller(uint8_t rightDuration, uint8_t rightPower, uint8_t leftDura
  */
 void onControllerConnect(){
     // Vibrates controller when you connect
-    if (newconnect == 0) {
+    if (newconnect) {
       rumbleContoller(50, 255, 50, 255);
-      newconnect++;
+      newconnect = false;
     }
 
     Serial.println("Controller is connected!");
 }
 
 int readJoystick(int8_t analogValue) {
-  // Read and map joystick value from -90 to 90
+  // Read and map joystick value from -128, 127 to -90, 90
   int value = map(analogValue, -128, 127, -90, 90);
   
   // Deal with stickyness from joysticks
@@ -188,7 +189,6 @@ int readJoystick(int8_t analogValue) {
 
   return value;
 }
-
 
 
 void setup() {// This is stuff for connecting the PS3 controller.
@@ -201,9 +201,7 @@ void setup() {// This is stuff for connecting the PS3 controller.
   // String dadfa = "rK9";
   // writeStoredName(dadfa);
 
-  readStoredName();
-
-// Add check for valid contoller mac address
+  readStoredName(); // Add check for valid contoller mac address
 
   // Attached the contoller connect function to connection callback and start contoller connection
   Ps3.attachOnConnect(onControllerConnect);
@@ -268,17 +266,7 @@ void loop() {
     leftY = readJoystick(Ps3.data.analog.stick.ly);
     rightX = readJoystick(Ps3.data.analog.stick.rx);
     rightY = readJoystick(Ps3.data.analog.stick.ry);
-    
-    #ifdef SHOW_CONTROLLER_INPUT
-      Serial.print(leftX);    
-      Serial.print("\t");
-      Serial.print(leftY);    
-      Serial.print("\t");
-      Serial.print(rightX);    
-      Serial.print("\t");
-      Serial.print(rightY);    
-      Serial.print("\n");
-    #endif
+
 
     //====================Specify the handicap=================================
     //Toggle in and out of kidsmode
@@ -308,16 +296,16 @@ void loop() {
     }
 
     //===============================Adjust motors=============================
-    if (Ps3.data.button.left && Ps3.data.button.select){
-      correctMotor(1);
-      Serial.println("Left button pressed");
-      rumbleContoller(0, 0, 5, 255);
-    }
-    if (Ps3.data.button.right && Ps3.data.button.select){
-      correctMotor(-1);
-      Serial.println("Right button pressed");
-      rumbleContoller(5, 255, 0, 0);
-    }
+    // if (Ps3.data.button.left && Ps3.data.button.select){
+    //   correctMotor(1);
+    //   Serial.println("Left button pressed");
+    //   rumbleContoller(0, 0, 5, 255);
+    // }
+    // if (Ps3.data.button.right && Ps3.data.button.select){
+    //   correctMotor(-1);
+    //   Serial.println("Right button pressed");
+    //   rumbleContoller(5, 255, 0, 0);
+    // }
 
     //=================================Tackle Sensor===========================
 
@@ -349,6 +337,19 @@ void loop() {
     #endif
   
     //===============================================================================================
+    
+    #ifdef SHOW_CONTROLLER_INPUT
+      Serial.print(handicap);    
+      Serial.print("\t");
+      Serial.print(leftX);    
+      Serial.print("\t");
+      Serial.print(leftY);    
+      Serial.print("\t");
+      Serial.print(rightX);    
+      Serial.print("\t");
+      Serial.print(rightY);    
+      Serial.print("\n");
+    #endif
 
     // Drives the robot according to joystick input
     driveCtrl(handicap, leftX, leftY, rightX, rightY);
@@ -363,12 +364,19 @@ void loop() {
     contollerStatus = "Disconnected";
     //Serial.println("Controller Disconnected");
   } 
+    
+  // if (millis() - lastBatteryRead > 200) {
+  //   lastBatteryRead = millis();
+  //   robotBattery = analogRead(batteryPin);
+  //   Serial.print("Battery Level: ");
+  //   Serial.println(robotBattery);
+  // }
 
   #ifdef WIRELESS
     // Stores the current time
     now = millis();
-    if (now  - lastMsg > 200) {
-      lastMsg = now;
+    if (millis() - lastMsg > 200) {
+      lastMsg = millis();
       sendRobotData(tackleStatus, contollerStatus);
     }
   #endif

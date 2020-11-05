@@ -125,4 +125,6 @@ This is a list of useful links and tutorials that were used.
 * ~~Replace EEPROM with esp32-Preferences~~
 * ~~Replace pubsubclient with async-mqtt-client~~
 * Make IP depend on robot name. Right now all IP are the same so they will conflict
+* Read IP address from EEPROM, has to be unique to each robot, faster if static but can be allocated by DHCP
 * Fix esp32 crashing when there is no robot name stored
+* Move contoller joystick reading code into drive files?

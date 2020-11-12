@@ -3,8 +3,8 @@
 
 #include <Preferences.h>
 
-//#include "Wireless/Wireless.cpp"
-//#define WIRELESS
+#include "Wireless/Wireless.cpp"
+#define WIRELESS
 
 //===========Uncomment a LED===========================
 #include "Leds/Leds.cpp"
@@ -378,6 +378,7 @@ void loop() {
     if (millis() - lastMsg > 200) {
       lastMsg = millis();
       sendRobotData(tackleStatus, contollerStatus);
+      //Serial.print("NEW CODE!!!!");
     }
   #endif
 

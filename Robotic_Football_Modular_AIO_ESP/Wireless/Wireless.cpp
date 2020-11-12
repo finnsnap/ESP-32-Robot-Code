@@ -22,10 +22,13 @@ const char* storedPassword;
  * Updates the esp32 code over http by connecting to a remote webserver
  */
 void update() {
-  mqttClient.disconnect();
+  mqttClient.disconnect(true);
+  
+  xTimerStop(mqttReconnectTimer, 0);
+  xTimerStop(wifiReconnectTimer, 0);
   Serial.println("MQTT disconnected");
 
-  t_httpUpdate_return ret = httpUpdate.update(wifiClient, "http://192.168.4.1:8080/public/esp32.bin");
+  t_httpUpdate_return ret = httpUpdate.update(wifiClient, "http://192.168.4.1:8080/public/binaries/esp32.bin");
   
   switch (ret) {
     case HTTP_UPDATE_FAILED:
@@ -52,7 +55,7 @@ void connectToWifi() {
   WiFi.disconnect();
   // WiFi.setAutoReconnect(true);
   /* See https://www.bakke.online/index.php/2017/05/22/reducing-wifi-power-consumption-on-esp8266-part-3/ for explanation */
-  IPAddress ip(192, 168, 0, 1);
+  IPAddress ip(192, 168, 4, 2);
   IPAddress gateway(192, 168, 4, 1);
   IPAddress subnet(255, 255, 255, 0);
 
@@ -82,6 +85,7 @@ void WiFiEvent(WiFiEvent_t event) {
         Serial.println("IP address: ");
         Serial.println(WiFi.localIP());
         connectToMqtt();
+        xTimerStop(wifiReconnectTimer, 0);
         break;
     case SYSTEM_EVENT_STA_DISCONNECTED:
         Serial.println("WiFi lost connection");
@@ -192,7 +196,7 @@ void onMqttConnect(bool sessionPresent) {
   Serial.print("Session present: ");
   Serial.println(sessionPresent);
   
-  uint16_t packetIdSub = mqttClient.subscribe("esp32/input", 2);
+  uint16_t packetIdSub = mqttClient.subscribe(robotName, 2);
   Serial.print("Subscribing at QoS 2, packetId: ");
   Serial.println(packetIdSub);
   
@@ -249,38 +253,39 @@ void onMqttUnsubscribe(uint16_t packetId) {
  * @param total Total
  */
 void onMqttMessage(char* topic, char* payload, AsyncMqttClientMessageProperties properties, size_t len, size_t index, size_t total) {
-  Serial.println("Publish received.");
-  Serial.print("  topic: ");
-  Serial.println(topic);
-  Serial.print(" payload: ");
-  Serial.println(payload);
-  Serial.print("  qos: ");
-  Serial.println(properties.qos);
-  Serial.print("  dup: ");
-  Serial.println(properties.dup);
-  Serial.print("  retain: ");
-  Serial.println(properties.retain);
-  Serial.print("  len: ");
-  Serial.println(len);
-  Serial.print("  index: ");
-  Serial.println(index);
-  Serial.print("  total: ");
-  Serial.println(total);
+  // Serial.println("Publish received.");
+  // Serial.print("  topic: ");
+  // Serial.println(topic);
+  // Serial.print(" payload: ");
+  // Serial.println(payload);
+  // Serial.print("  qos: ");
+  // Serial.println(properties.qos);
+  // Serial.print("  dup: ");
+  // Serial.println(properties.dup);
+  // Serial.print("  retain: ");
+  // Serial.println(properties.retain);
+  // Serial.print("  len: ");
+  // Serial.println(len);
+  // Serial.print("  index: ");
+  // Serial.println(index);
+  // Serial.print("  total: ");
+  // Serial.println(total);
 
   char messageCommand;
   String messageTemp;
   String messageInput;
-
+  
+  //Serial.print(" payload: ");
   for (int i = 0; i < len; i++) {
-    Serial.print((char)payload[i]);
+    //Serial.print((char)payload[i]);
     messageTemp += (char)payload[i];
   }
 
-  if (String(topic) == "esp32/input") {
+  if (*topic == *robotName) {
     //Serial.print("Changing output to ");
 
-    //payload = messageTemp[0]; // Maybe change up to pointers to make more efficient?
     int index = 0;
+    messageCommand = messageTemp[0];
     for (int i = 1; i < len; i++) if (messageTemp[i] == '-') index = i + 1;
     for (int i = index; i < len; i++) messageInput += messageTemp[i];
     
@@ -289,10 +294,16 @@ void onMqttMessage(char* topic, char* payload, AsyncMqttClientMessageProperties 
       update();
     }
     else if(messageCommand == 'r'){
-      Serial.print("Name read from EEPROM:");
-      Serial.print(robotName);
+      Serial.print("Reprogramming robot with file: ");
+      Serial.print(messageInput);
       Serial.print("\n");
+      update();
     }
+    // else if(messageCommand == 'r'){
+    //   Serial.print("Name read from EEPROM:");
+    //   Serial.print(robotName);
+    //   Serial.print("\n");
+    // }
     // else if(messageCommand == 'w'){
     //   writeStoredName(messageInput);
     //   Serial.print("Name written to EEPROM: ");
@@ -325,9 +336,9 @@ void wirelessSetup(const char* ssid, const char* password, const char* mqttHost,
   mqttClient.onConnect(onMqttConnect);
   mqttClient.onDisconnect(onMqttDisconnect);
   mqttClient.onSubscribe(onMqttSubscribe);
-  mqttClient.onUnsubscribe(onMqttUnsubscribe);
+  //mqttClient.onUnsubscribe(onMqttUnsubscribe);
   mqttClient.onMessage(onMqttMessage);
-  mqttClient.onPublish(onMqttPublish);
+  //mqttClient.onPublish(onMqttPublish);
   mqttClient.setServer(mqttHost, mqttPort);
 
   storedSsid = ssid;
@@ -362,7 +373,7 @@ void sendRobotData(char* tackleStatus, char* contollerStatus) {
     size_t n = serializeJson(data, buffer);
 
     // Print json data to serial port
-    serializeJson(data, Serial);
+    //serializeJson(data, Serial);
 
     if (mqttClient.publish("esp32/output", 2, false, buffer, n) == 0) {
       Serial.print(" Error sending message\n");

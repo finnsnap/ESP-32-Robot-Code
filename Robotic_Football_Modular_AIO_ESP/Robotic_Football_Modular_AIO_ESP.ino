@@ -379,6 +379,7 @@ void loop() {
       lastMsg = millis();
       sendRobotData(tackleStatus, contollerStatus);
       //Serial.print("NEW CODE!!!!");
+      checkForUpdate();
     }
   #endif
 

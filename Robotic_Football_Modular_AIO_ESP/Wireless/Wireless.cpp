@@ -18,34 +18,35 @@ char espMacAddress[18];
 const char* storedSsid;
 const char* storedPassword;
 
+bool updateStatus = false;
+
 /**
  * Updates the esp32 code over http by connecting to a remote webserver
  */
-void update() {
-  mqttClient.disconnect(true);
-  
-  xTimerStop(mqttReconnectTimer, 0);
-  xTimerStop(wifiReconnectTimer, 0);
-  Serial.println("MQTT disconnected");
+void checkForUpdate() {
+  if (updateStatus) {
+    mqttClient.disconnect(true);
+    xTimerStop(mqttReconnectTimer, 0);
+    xTimerStop(wifiReconnectTimer, 0);
+    Serial.println("MQTT disconnected");
 
-  t_httpUpdate_return ret = httpUpdate.update(wifiClient, "http://192.168.4.1:8080/public/binaries/esp32.bin");
-  
-  switch (ret) {
-    case HTTP_UPDATE_FAILED:
-      Serial.printf("HTTP_UPDATE_FAILED Error (%d): %s\n", httpUpdate.getLastError(), httpUpdate.getLastErrorString().c_str());
-      break;
+    t_httpUpdate_return ret = httpUpdate.update(wifiClient, "http://192.168.4.1:8080/public/binaries/esp32.bin");
+    
+    switch (ret) {
+      case HTTP_UPDATE_FAILED:
+        Serial.printf("HTTP_UPDATE_FAILED Error (%d): %s\n", httpUpdate.getLastError(), httpUpdate.getLastErrorString().c_str());
+        break;
 
-    case HTTP_UPDATE_NO_UPDATES:
-      Serial.println("HTTP_UPDATE_NO_UPDATES");
-      break;
+      case HTTP_UPDATE_NO_UPDATES:
+        Serial.println("HTTP_UPDATE_NO_UPDATES");
+        break;
 
-    case HTTP_UPDATE_OK:
-      Serial.println("HTTP_UPDATE_OK");
-      break;
+      case HTTP_UPDATE_OK:
+        Serial.println("HTTP_UPDATE_OK");
+        break;
+    }
   }
 }
-
-
 
 /**
  * Connect to WiFi
@@ -291,13 +292,12 @@ void onMqttMessage(char* topic, char* payload, AsyncMqttClientMessageProperties 
     
     if(messageTemp == "p"){
       Serial.println("Reprogramming");
-      update();
     }
     else if(messageCommand == 'r'){
       Serial.print("Reprogramming robot with file: ");
       Serial.print(messageInput);
       Serial.print("\n");
-      update();
+      updateStatus = true;
     }
     // else if(messageCommand == 'r'){
     //   Serial.print("Name read from EEPROM:");

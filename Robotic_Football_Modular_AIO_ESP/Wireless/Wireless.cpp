@@ -20,10 +20,21 @@ const char* storedPassword;
 
 bool updateStatus = false;
 
-/**
+IPAddress ip;
+IPAddress gateway(192, 168, 4, 1);
+IPAddress subnet(255, 255, 255, 0);
+
+void setIPAddress(int number) {
+  ip = IPAddress(192, 168, 4, number);
+  Serial.print("IPAddress of robot: ");
+  ip.printTo(Serial);
+  Serial.println();
+}
+    /**
  * Updates the esp32 code over http by connecting to a remote webserver
  */
-void checkForUpdate() {
+    void checkForUpdate()
+{
   if (updateStatus) {
     mqttClient.disconnect(true);
     xTimerStop(mqttReconnectTimer, 0);
@@ -56,9 +67,6 @@ void connectToWifi() {
   WiFi.disconnect();
   // WiFi.setAutoReconnect(true);
   /* See https://www.bakke.online/index.php/2017/05/22/reducing-wifi-power-consumption-on-esp8266-part-3/ for explanation */
-  IPAddress ip(192, 168, 4, 2);
-  IPAddress gateway(192, 168, 4, 1);
-  IPAddress subnet(255, 255, 255, 0);
 
   WiFi.persistent(false);
   WiFi.mode(WIFI_STA);
@@ -71,6 +79,7 @@ void connectToWifi() {
  */
 void connectToMqtt() {
   Serial.println("Connecting to MQTT...");
+  mqttClient.disconnect();
   mqttClient.connect();
 }
 
@@ -328,8 +337,8 @@ void onMqttPublish(uint16_t packetId) {
 
 
 void wirelessSetup(const char* ssid, const char* password, const char* mqttHost, const uint16_t mqttPort, char* name) {
-  mqttReconnectTimer = xTimerCreate("mqttTimer", pdMS_TO_TICKS(2000), pdFALSE, (void*)0, reinterpret_cast<TimerCallbackFunction_t>(connectToMqtt));
-  wifiReconnectTimer = xTimerCreate("wifiTimer", pdMS_TO_TICKS(2000), pdFALSE, (void*)0, reinterpret_cast<TimerCallbackFunction_t>(connectToWifi));
+  mqttReconnectTimer = xTimerCreate("mqttTimer", pdMS_TO_TICKS(500), pdFALSE, (void*)0, reinterpret_cast<TimerCallbackFunction_t>(connectToMqtt));
+  wifiReconnectTimer = xTimerCreate("wifiTimer", pdMS_TO_TICKS(500), pdFALSE, (void*)0, reinterpret_cast<TimerCallbackFunction_t>(connectToWifi));
 
   WiFi.onEvent(WiFiEvent);
 
@@ -386,7 +395,7 @@ void sendRobotData(char* tackleStatus, char* contollerStatus) {
     Serial.println("Failed to send robot data. WiFi disconnected");
   }
   else if(!mqttClient.connected()) {
-    Serial.println("Failed to send robot data. MQTT disconnected");
+    //Serial.println("Failed to send robot data. MQTT disconnected");
   }
   else {
     Serial.println("Failed to send robot data.");

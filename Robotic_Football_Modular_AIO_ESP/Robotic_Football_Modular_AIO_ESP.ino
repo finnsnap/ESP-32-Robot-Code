@@ -144,6 +144,8 @@ void readStoredName() {
       macaddress = macAddressList[i];
       Serial.println(robotNames[i]);
       Serial.println(macaddress);
+
+      setIPAddress(i + 2);
       break;
     }
   }

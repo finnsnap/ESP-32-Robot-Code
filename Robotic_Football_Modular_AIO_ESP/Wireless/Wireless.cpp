@@ -6,6 +6,8 @@
 #include <HTTPClient.h>
 #include <HTTPUpdate.h>
 
+#include "../Leds/Leds.cpp"
+
 WiFiClient wifiClient;
 
 AsyncMqttClient mqttClient;
@@ -40,6 +42,10 @@ void setIPAddress(int number) {
     mqttClient.disconnect(true);
     xTimerStop(mqttReconnectTimer, 0);
     xTimerStop(wifiReconnectTimer, 0);
+
+    flashLeds();
+    ledsOff();
+
     Serial.println("MQTT disconnected");
 
     Serial.println("Reprogramming with: ");
@@ -95,11 +101,11 @@ void WiFiEvent(WiFiEvent_t event) {
     Serial.printf("[WiFi-event] event: %d\n", event);
     switch(event) {
     case SYSTEM_EVENT_STA_GOT_IP:
+        xTimerStop(wifiReconnectTimer, 0);
         Serial.println("WiFi connected");
         Serial.println("IP address: ");
         Serial.println(WiFi.localIP());
         connectToMqtt();
-        xTimerStop(wifiReconnectTimer, 0);
         break;
     case SYSTEM_EVENT_STA_DISCONNECTED:
         Serial.println("WiFi lost connection");
@@ -206,6 +212,7 @@ void WiFiEvent(WiFiEvent_t event) {
  * @param sessionPresent Wheather the session is present or not
  */
 void onMqttConnect(bool sessionPresent) {
+  xTimerStop(mqttReconnectTimer, 0);
   Serial.println("Connected to MQTT.");
   Serial.print("Session present: ");
   Serial.println(sessionPresent);
@@ -384,7 +391,7 @@ void sendRobotData(char* tackleStatus, char* contollerStatus) {
     // Print json data to serial port
     //serializeJson(data, Serial);
 
-    if (mqttClient.publish("esp32/output", 2, false, buffer, n) == 0) {
+    if (mqttClient.publish("esp32/output", 0, false, buffer, n) == 0) {
       Serial.print(" Error sending message\n");
     }
     else {

@@ -1,14 +1,14 @@
 #include "../src/ESP32Servo/src/ESP32Servo.h"
 
-Servo leftMotor, rightMotor;        // Define motor objects
-static int drive = 0;               // Initial speed before turning calculations
-static int turn = 0;                // Turn is adjustment to drive for each motor separately to create turns
+Servo leftMotor, rightMotor; // Define motor objects
+static int drive = 0;        // Initial speed before turning calculations
+static int turn = 0;         // Turn is adjustment to drive for each motor separately to create turns
 static int motorDirection = 1;
 static int xInput, yInput, throttleL, throttleR;
 static int motorCorrection = 0;
-#define LEFT_MOTOR            19     // left motor is wired to pin 9
-#define RIGHT_MOTOR           18     // right motor is wired to pin 10
-#define MAX_DRIVE             90     // limited because of issues with calibrating victors to full 0-180 range
+#define LEFT_MOTOR 19  // left motor is wired to pin 9
+#define RIGHT_MOTOR 18 // right motor is wired to pin 10
+#define MAX_DRIVE 90   // limited because of issues with calibrating victors to full 0-180 range
 
 //#define SHOW_DEBUG_INFO   //Uncomment to print debug info over serial port
 
@@ -16,7 +16,8 @@ static int motorCorrection = 0;
  * Sets up the motors by attaching them to the correct pins
  * @param motorType Defines the direction of the motors
  */
-void driveSetup(int motorType) {
+void driveSetup(int motorType)
+{
   /* These lines are attaching the motor objects to their output pins on the arduino
     1000, 2000 refers to the minimum and maximum pulse widths to send to the motors (AKA full forward/reverse)
     1500 represents stop
@@ -38,62 +39,66 @@ void driveSetup(int motorType) {
  */
 void driveCtrl(int handicap, int leftX, int leftY, int rightX, int rightY)
 {
-  if (leftY == 0 && rightX == 0) //&& (rightX == 0) && (rightY == 0))
+  if ((rightY == 0) && (leftX == 0))
   { /* If no input this should ensure that the motors actually stop 
       and skip the rest of the drive function 
       */
     leftMotor.write(90);
     rightMotor.write(90);
-
-    Serial.print("No drive");
-    Serial.print("\t");
   }
-  else {
-    if (drive < leftY) drive++;    // Accelerates
-    else if (drive > leftY) drive--;   // Decelerates
 
-    if (turn < rightX) turn++;    //Turns left?
-    else if (turn > rightX) turn--;   //Turns right?
+  if (drive < leftY)
+    drive++; // Accelerates
+  else if (drive > leftY)
+    drive--; // Decelerates
 
-    // These are the final variables that decide motor speed
-    throttleL = motorDirection * ((drive - turn) / handicap);
-    throttleR = -1 * motorDirection * ((drive + turn) / handicap) + motorCorrection;
+  if (turn < rightX)
+    turn++; //Turns left?
+  else if (turn > rightX)
+    turn--; //Turns right?
 
-    // Limiting the max value of the throttle
-    if (throttleL > MAX_DRIVE) throttleL = MAX_DRIVE;
-    else if (throttleL < -MAX_DRIVE) throttleL = -MAX_DRIVE;
-    if (throttleR > MAX_DRIVE) throttleR = MAX_DRIVE;
-    else if (throttleR < -MAX_DRIVE) throttleR = -MAX_DRIVE;
+  // These are the final variables that decide motor speed
+  throttleL = motorDirection * ((drive - turn) / handicap);
+  throttleR = -1 * motorDirection * ((drive + turn) / handicap) + motorCorrection;
 
-    // Sending values to the speed controllers
-    leftMotor.write(throttleL + 90);
-    rightMotor.write(throttleR + 90);
-    
-    #ifdef SHOW_DEBUG_INFO
-      Serial.print("Throttle Left: ");
-      Serial.print(throttleL);
-      Serial.print("Throttle Right: ");
-      Serial.print(throttleR);
-      Serial.print("\t");
-    #endif
-  }
-  
+  // Limiting the max value of the throttle
+  if (throttleL > MAX_DRIVE)
+    throttleL = MAX_DRIVE;
+  else if (throttleL < -MAX_DRIVE)
+    throttleL = -MAX_DRIVE;
+  if (throttleR > MAX_DRIVE)
+    throttleR = MAX_DRIVE;
+  else if (throttleR < -MAX_DRIVE)
+    throttleR = -MAX_DRIVE;
 
+  // Sending values to the speed controllers
+  leftMotor.write(throttleL + 90);
+  rightMotor.write(throttleR + 90);
+
+#ifdef SHOW_DEBUG_INFO
+  Serial.print("Throttle Left: ");
+  Serial.print(throttleL);
+  Serial.print("Throttle Right: ");
+  Serial.print(throttleR);
+  Serial.print("\t");
+#endif
 }
 
 /**
  * Corrects the motors if the robot does not drive straight
  * @param correction +1 if correction to the left, -1 if correction to the right
  */
-void correctMotor(int correction){
-  if (motorCorrection > -90 && motorCorrection < 90){
+void correctMotor(int correction)
+{
+  if (motorCorrection > -90 && motorCorrection < 90)
+  {
     motorCorrection += correction;
   }
-  #ifdef SHOW_DEBUG_INFO
-    Serial.print("Motor correction: ");
-    Serial.print(motorCorrection);
-    Serial.print("\t");
-  #endif
+#ifdef SHOW_DEBUG_INFO
+  Serial.print("Motor correction: ");
+  Serial.print(motorCorrection);
+  Serial.print("\t");
+#endif
 }
 
 /**

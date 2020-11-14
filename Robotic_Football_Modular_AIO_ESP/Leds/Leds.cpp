@@ -51,3 +51,9 @@ void blue() {
   digitalWrite(GREEN_LED, LOW);
   digitalWrite(RED_LED, LOW);
 }
+
+void ledsOff() {
+  digitalWrite(BLUE_LED, LOW);
+  digitalWrite(GREEN_LED, LOW);
+  digitalWrite(RED_LED, LOW);
+}

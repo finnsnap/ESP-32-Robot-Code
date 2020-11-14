@@ -19,6 +19,7 @@ const char* storedSsid;
 const char* storedPassword;
 
 bool updateStatus = false;
+String filename = "";
 
 IPAddress ip;
 IPAddress gateway(192, 168, 4, 1);
@@ -41,7 +42,10 @@ void setIPAddress(int number) {
     xTimerStop(wifiReconnectTimer, 0);
     Serial.println("MQTT disconnected");
 
-    t_httpUpdate_return ret = httpUpdate.update(wifiClient, "http://192.168.4.1:8080/public/binaries/esp32.bin");
+    Serial.println("Reprogramming with: ");
+    Serial.println("http://192.168.4.1:8080/public/binaries/" + filename);
+
+    t_httpUpdate_return ret = httpUpdate.update(wifiClient, "http://192.168.4.1:8080/public/binaries/" + filename);
     
     switch (ret) {
       case HTTP_UPDATE_FAILED:
@@ -283,7 +287,6 @@ void onMqttMessage(char* topic, char* payload, AsyncMqttClientMessageProperties 
 
   char messageCommand;
   String messageTemp;
-  String messageInput;
   
   //Serial.print(" payload: ");
   for (int i = 0; i < len; i++) {
@@ -296,16 +299,13 @@ void onMqttMessage(char* topic, char* payload, AsyncMqttClientMessageProperties 
 
     int index = 0;
     messageCommand = messageTemp[0];
-    for (int i = 1; i < len; i++) if (messageTemp[i] == '-') index = i + 1;
-    for (int i = index; i < len; i++) messageInput += messageTemp[i];
-    
-    if(messageTemp == "p"){
-      Serial.println("Reprogramming");
-    }
-    else if(messageCommand == 'r'){
-      Serial.print("Reprogramming robot with file: ");
-      Serial.print(messageInput);
-      Serial.print("\n");
+    String messageInput = messageTemp.substring(messageTemp.indexOf('-') + 1);
+
+    if(messageCommand == 'p'){
+      // Serial.print("Reprogramming robot with file: ");
+      // Serial.print(messageInput);
+      // Serial.print("\n");
+      filename = messageInput;
       updateStatus = true;
     }
     // else if(messageCommand == 'r'){

@@ -80,7 +80,7 @@ void driveCtrl(int handicap, int leftX, int leftY, int rightX, int rightY)
   Serial.print(throttleL);
   Serial.print("Throttle Right: ");
   Serial.print(throttleR);
-  Serial.print("\t");
+  Serial.print("\n");
 #endif
 }
 
@@ -94,11 +94,11 @@ void correctMotor(int correction)
   {
     motorCorrection += correction;
   }
-#ifdef SHOW_DEBUG_INFO
-  Serial.print("Motor correction: ");
-  Serial.print(motorCorrection);
-  Serial.print("\t");
-#endif
+// #ifdef SHOW_DEBUG_INFO
+//   Serial.print("Motor correction: ");
+//   Serial.print(motorCorrection);
+//   Serial.print("\t");
+// #endif
 }
 
 /**

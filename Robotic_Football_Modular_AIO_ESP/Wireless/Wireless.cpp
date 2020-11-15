@@ -274,24 +274,6 @@ void onMqttUnsubscribe(uint16_t packetId) {
  * @param total Total
  */
 void onMqttMessage(char* topic, char* payload, AsyncMqttClientMessageProperties properties, size_t len, size_t index, size_t total) {
-  // Serial.println("Publish received.");
-  // Serial.print("  topic: ");
-  // Serial.println(topic);
-  // Serial.print(" payload: ");
-  // Serial.println(payload);
-  // Serial.print("  qos: ");
-  // Serial.println(properties.qos);
-  // Serial.print("  dup: ");
-  // Serial.println(properties.dup);
-  // Serial.print("  retain: ");
-  // Serial.println(properties.retain);
-  // Serial.print("  len: ");
-  // Serial.println(len);
-  // Serial.print("  index: ");
-  // Serial.println(index);
-  // Serial.print("  total: ");
-  // Serial.println(total);
-
   char messageCommand;
   String messageTemp;
   
@@ -309,9 +291,6 @@ void onMqttMessage(char* topic, char* payload, AsyncMqttClientMessageProperties 
     String messageInput = messageTemp.substring(messageTemp.indexOf('-') + 1);
 
     if(messageCommand == 'p'){
-      // Serial.print("Reprogramming robot with file: ");
-      // Serial.print(messageInput);
-      // Serial.print("\n");
       filename = messageInput;
       updateStatus = true;
     }
@@ -332,17 +311,6 @@ void onMqttMessage(char* topic, char* payload, AsyncMqttClientMessageProperties 
   }
 }
 
-/**
- * Callback function to ackknowledge the client sending a message
- * @param packetID The ID of the message that was sent
- */
-void onMqttPublish(uint16_t packetId) {
-  Serial.println("Publish acknowledged.");
-  Serial.print("  packetId: ");
-  Serial.println(packetId);
-}
-
-
 void wirelessSetup(const char* ssid, const char* password, const char* mqttHost, const uint16_t mqttPort, char* name) {
   mqttReconnectTimer = xTimerCreate("mqttTimer", pdMS_TO_TICKS(500), pdFALSE, (void*)0, reinterpret_cast<TimerCallbackFunction_t>(connectToMqtt));
   wifiReconnectTimer = xTimerCreate("wifiTimer", pdMS_TO_TICKS(500), pdFALSE, (void*)0, reinterpret_cast<TimerCallbackFunction_t>(connectToWifi));
@@ -354,7 +322,6 @@ void wirelessSetup(const char* ssid, const char* password, const char* mqttHost,
   mqttClient.onSubscribe(onMqttSubscribe);
   //mqttClient.onUnsubscribe(onMqttUnsubscribe);
   mqttClient.onMessage(onMqttMessage);
-  //mqttClient.onPublish(onMqttPublish);
   mqttClient.setServer(mqttHost, mqttPort);
 
   storedSsid = ssid;
@@ -395,7 +362,7 @@ void sendRobotData(char* tackleStatus, char* contollerStatus) {
       Serial.print(" Error sending message\n");
     }
     else {
-      Serial.print(" Success sending message\n");
+      //Serial.print(" Success sending message\n");
     }
   }
   else if(WiFi.status() != WL_CONNECTED) {

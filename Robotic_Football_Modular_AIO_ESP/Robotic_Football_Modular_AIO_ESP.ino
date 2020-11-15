@@ -7,9 +7,10 @@
 #define WIRELESS
 
 //===========Uncomment a LED===========================
-//#include "Leds/Leds.cpp"
-//#include "Leds/OldLeds.cpp"
-
+#ifndef WIRELESS
+  #include "Leds/Leds.cpp"
+  //#include "Leds/OldLeds.cpp"
+#endif
 //===========Uncomment a drive train===================
 #include "DriveTrains/BasicDrive.cpp"
 //#include "DriveTrains/CenterDrive.cpp"
@@ -32,6 +33,7 @@
 //#define SHOW_EXECUTION_TIME
 
 //===================================
+
 //Includes the right peripheral file for specified position
 #ifdef WR
     #define PERIPHERAL
@@ -71,7 +73,7 @@ uint8_t handicap = 3;
 bool kidsMode = false;
 
 // Define joystick variables and other useful variables
-uint8_t leftX, leftY, rightX, rightY;
+int8_t leftX, leftY, rightX, rightY;
 bool newconnect = true;
 ps3_cmd_t cmd;
 unsigned long exeTime, now, lastMsg, lastBatteryRead;
@@ -136,16 +138,20 @@ void readStoredName() {
   }
 
   Serial.print("Read name: ");
-  Serial.print(name);
-  Serial.print("\n");
+  Serial.println(name);
+
+
 
   for (int i = 0; i < 18; i++) { // Change 18 to make work with any length mac address array
     if (strcmp(name, robotNames[i]) == 0) {
       macaddress = macAddressList[i];
-      Serial.println(robotNames[i]);
+      Serial.print("Read contoller macaddress: ");
       Serial.println(macaddress);
 
-      setIPAddress(i + 2);
+      #ifdef WIRELESS
+        setIPAddress(i + 2);
+      #endif
+
       break;
     }
   }
@@ -182,12 +188,17 @@ void onControllerConnect(){
     Serial.println("Controller is connected!");
 }
 
+// Read and map joystick value from -128, 127 to -90, 90
 int readJoystick(int8_t analogValue) {
-  // Read and map joystick value from -128, 127 to -90, 90
   int value = map(analogValue, -128, 127, -90, 90);
-  
+
   // Deal with stickyness from joysticks
   if (abs(value) < 8) value = 0;
+
+  //Serial.print("analogValue: ");
+  //Serial.print(analogValue);
+  //Serial.print("\tvalue: ");
+  //Serial.println(value);
 
   return value;
 }
@@ -225,9 +236,9 @@ void setup() {// This is stuff for connecting the PS3 controller.
   #endif
 
   #ifdef TACKLE
-      green();
+    green();
   #else
-      blue();
+    blue();
   #endif   
 }
 
@@ -242,7 +253,6 @@ void loop() {
   // Run if the controller is connected
   if (Ps3.isConnected()) {
     contollerStatus = "Connected";   
-    //Serial.println("Contoller connected"); 
     
     // if( battery != Ps3.data.status.battery ){
     //     battery = Ps3.data.status.battery;
@@ -268,6 +278,7 @@ void loop() {
     leftY = readJoystick(Ps3.data.analog.stick.ly);
     rightX = readJoystick(Ps3.data.analog.stick.rx);
     rightY = readJoystick(Ps3.data.analog.stick.ry);
+
 
 
     //====================Specify the handicap=================================
@@ -339,32 +350,31 @@ void loop() {
     #endif
   
     //===============================================================================================
-    
+
     #ifdef SHOW_CONTROLLER_INPUT
-      Serial.print(handicap);    
-      Serial.print("\t");
-      Serial.print(leftX);    
-      Serial.print("\t");
-      Serial.print(leftY);    
-      Serial.print("\t");
-      Serial.print(rightX);    
-      Serial.print("\t");
-      Serial.print(rightY);    
-      Serial.print("\n");
+          Serial.print(handicap);
+          Serial.print("\t");
+          Serial.print(leftX);
+          Serial.print("\t");
+          Serial.print(leftY);
+          Serial.print("\t");
+          Serial.print(rightX);
+          Serial.print("\t");
+          Serial.print(rightY);
+          Serial.print("\n");
     #endif
 
     // Drives the robot according to joystick input
     driveCtrl(handicap, leftX, leftY, rightX, rightY);
 
     #ifdef PERIPHERAL
-        peripheral(Ps3);//Call the peripheral
+      peripheral(Ps3); //Call the peripheral
     #endif
   }
   else { // If the controller is not connected, LEDs blue and stop robot
     blue();
     driveStop();
     contollerStatus = "Disconnected";
-    //Serial.println("Controller Disconnected");
   } 
     
   // if (millis() - lastBatteryRead > 200) {
@@ -380,7 +390,8 @@ void loop() {
     if (millis() - lastMsg > 200) {
       lastMsg = millis();
       sendRobotData(tackleStatus, contollerStatus);
-      //Serial.print("NEW CODE!!!!");
+      // Serial.println("Sent robot data");
+      // Serial.print("NEW CODE!!!!");
       checkForUpdate();
     }
   #endif

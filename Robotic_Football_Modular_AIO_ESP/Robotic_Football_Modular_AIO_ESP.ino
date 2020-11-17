@@ -17,7 +17,7 @@
 //#include "DriveTrains/SquareOmniDrive.cpp"
 
 //===========Uncomment for tackle sensor===============
-//#define TACKLE
+#define TACKLE
 
 //===========Uncomment to choose a Position============
 //#define WR
@@ -29,7 +29,7 @@
 //#define OldMotors
 
 //===========Uncomment for debug modes=================
-#define SHOW_CONTROLLER_INPUT
+//#define SHOW_CONTROLLER_INPUT
 //#define SHOW_EXECUTION_TIME
 
 //===================================
@@ -188,9 +188,6 @@ void onControllerConnect(){
     Serial.println("Controller is connected!");
 }
 
-void onContollerDisconnect() {
-  Serial.println("CONTOLLER HAS DISCONNECTED");
-}
 
 // Read and map joystick value from -128, 127 to -90, 90
 int readJoystick(int8_t analogValue) {
@@ -205,10 +202,6 @@ int readJoystick(int8_t analogValue) {
   //Serial.println(value);
 
   return value;
-}
-void notify() {
-if ( Ps3.data.button.triangle )
-    Serial.println("Currently pressing the trangle button");
 }
 
 void setup() {// This is stuff for connecting the PS3 controller.
@@ -229,8 +222,6 @@ void setup() {// This is stuff for connecting the PS3 controller.
   
   // Attached the contoller connect function to connection callback and start contoller connection
   Ps3.attachOnConnect(onControllerConnect);
-  Ps3.attachOnDisconnect(onContollerDisconnect);
-  Ps3.attach(notify);
   Ps3.begin(macaddress);
   
   //Setup the drive train, peripherals, tackle sensor, and changes leds to green once complete

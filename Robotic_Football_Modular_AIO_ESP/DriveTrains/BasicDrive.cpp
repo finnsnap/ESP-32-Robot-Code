@@ -39,7 +39,7 @@ void driveSetup(int motorType)
  */
 void driveCtrl(int handicap, int leftX, int leftY, int rightX, int rightY)
 {
-  if ((rightY == 0) && (leftX == 0))
+  if ((leftY == 0) && (rightX == 0))
   { /* If no input this should ensure that the motors actually stop 
       and skip the rest of the drive function 
       */

@@ -372,7 +372,7 @@ void sendRobotData(char* tackleStatus, char* contollerStatus) {
     //Serial.println("Failed to send robot data. MQTT disconnected");
   }
   else {
-    Serial.println("Failed to send robot data.");
+    //Serial.println("Failed to send robot data.");
 
   }
   

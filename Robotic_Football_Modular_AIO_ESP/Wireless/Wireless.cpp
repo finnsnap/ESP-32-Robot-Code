@@ -29,9 +29,9 @@ IPAddress subnet(255, 255, 255, 0);
 
 void setIPAddress(int number) {
   ip = IPAddress(192, 168, 4, number);
-  Serial.print("IPAddress of robot: ");
-  ip.printTo(Serial);
-  Serial.println();
+  //Serial.print("IPAddress of robot: ");
+  //ip.printTo(Serial);
+  //Serial.println();
 }
     /**
  * Updates the esp32 code over http by connecting to a remote webserver
@@ -73,9 +73,9 @@ void setIPAddress(int number) {
  * Connect to WiFi
  */
 void connectToWifi() {
-  Serial.println("Connecting to Wi-Fi...");
-  WiFi.disconnect();
-  // WiFi.setAutoReconnect(true);
+  //Serial.println("Connecting to Wi-Fi...");
+  //WiFi.disconnect();
+  WiFi.setAutoReconnect(false);
   /* See https://www.bakke.online/index.php/2017/05/22/reducing-wifi-power-consumption-on-esp8266-part-3/ for explanation */
 
   WiFi.persistent(false);
@@ -88,7 +88,7 @@ void connectToWifi() {
  * Connect to the MQTT server
  */
 void connectToMqtt() {
-  Serial.println("Connecting to MQTT...");
+  //Serial.println("Connecting to MQTT...");
   mqttClient.disconnect();
   mqttClient.connect();
 }
@@ -98,17 +98,17 @@ void connectToMqtt() {
  * @param event The WiFi event
  */
 void WiFiEvent(WiFiEvent_t event) {
-    Serial.printf("[WiFi-event] event: %d\n", event);
+    //Serial.printf("[WiFi-event] event: %d\n", event);
     switch(event) {
     case SYSTEM_EVENT_STA_GOT_IP:
         xTimerStop(wifiReconnectTimer, 0);
-        Serial.println("WiFi connected");
-        Serial.println("IP address: ");
-        Serial.println(WiFi.localIP());
+        //Serial.println("WiFi connected");
+        //Serial.println("IP address: ");
+        //Serial.println(WiFi.localIP());
         connectToMqtt();
         break;
     case SYSTEM_EVENT_STA_DISCONNECTED:
-        Serial.println("WiFi lost connection");
+        //Serial.println("WiFi lost connection");
         xTimerStop(mqttReconnectTimer, 0); // ensure we don't reconnect to MQTT while reconnecting to Wi-Fi
 		    xTimerStart(wifiReconnectTimer, 0);
         break;
@@ -213,13 +213,13 @@ void WiFiEvent(WiFiEvent_t event) {
  */
 void onMqttConnect(bool sessionPresent) {
   xTimerStop(mqttReconnectTimer, 0);
-  Serial.println("Connected to MQTT.");
-  Serial.print("Session present: ");
-  Serial.println(sessionPresent);
+  //Serial.println("Connected to MQTT.");
+  //Serial.print("Session present: ");
+  //Serial.println(sessionPresent);
   
   uint16_t packetIdSub = mqttClient.subscribe(robotName, 2);
-  Serial.print("Subscribing at QoS 2, packetId: ");
-  Serial.println(packetIdSub);
+  //Serial.print("Subscribing at QoS 2, packetId: ");
+  //Serial.println(packetIdSub);
   
   // mqttClient.publish("esp32/output", 0, true, "test 1");
   // Serial.println("Publishing at QoS 0");
@@ -236,7 +236,7 @@ void onMqttConnect(bool sessionPresent) {
  * @param reason The reason why the mqtt client was disconnected
  */
 void onMqttDisconnect(AsyncMqttClientDisconnectReason reason) {
-  Serial.println("Disconnected from MQTT.");
+  //Serial.println("Disconnected from MQTT.");
 
   if (WiFi.isConnected()) {
     xTimerStart(mqttReconnectTimer, 0);
@@ -247,20 +247,20 @@ void onMqttDisconnect(AsyncMqttClientDisconnectReason reason) {
  * Callback function for acknowledging a subscription to a topic
  */
 void onMqttSubscribe(uint16_t packetId, uint8_t qos) {
-  Serial.println("Subscribe acknowledged.");
-  Serial.print("  packetId: ");
-  Serial.println(packetId);
-  Serial.print("  qos: ");
-  Serial.println(qos);
+  //Serial.println("Subscribe acknowledged.");
+  //Serial.print("  packetId: ");
+  //Serial.println(packetId);
+  //Serial.print("  qos: ");
+  //Serial.println(qos);
 }
 
 /**
  * Callback function for acknowledging an unsubscription from a topic
  */
 void onMqttUnsubscribe(uint16_t packetId) {
-  Serial.println("Unsubscribe acknowledged.");
-  Serial.print("  packetId: ");
-  Serial.println(packetId);
+  //Serial.println("Unsubscribe acknowledged.");
+  //Serial.print("  packetId: ");
+  //Serial.println(packetId);
 }
 
 
@@ -306,20 +306,20 @@ void onMqttMessage(char* topic, char* payload, AsyncMqttClientMessageProperties 
     //   Serial.print("\n");
     // }
     else {
-      Serial.println("Invalid message");
+      //Serial.println("Invalid message");
     }
   }
 }
 
 void wirelessSetup(const char* ssid, const char* password, const char* mqttHost, const uint16_t mqttPort, char* name) {
   mqttReconnectTimer = xTimerCreate("mqttTimer", pdMS_TO_TICKS(500), pdFALSE, (void*)0, reinterpret_cast<TimerCallbackFunction_t>(connectToMqtt));
-  wifiReconnectTimer = xTimerCreate("wifiTimer", pdMS_TO_TICKS(500), pdFALSE, (void*)0, reinterpret_cast<TimerCallbackFunction_t>(connectToWifi));
+  wifiReconnectTimer = xTimerCreate("wifiTimer", pdMS_TO_TICKS(3000), pdFALSE, (void*)0, reinterpret_cast<TimerCallbackFunction_t>(connectToWifi));
 
   WiFi.onEvent(WiFiEvent);
 
   mqttClient.onConnect(onMqttConnect);
   mqttClient.onDisconnect(onMqttDisconnect);
-  mqttClient.onSubscribe(onMqttSubscribe);
+  //mqttClient.onSubscribe(onMqttSubscribe);
   //mqttClient.onUnsubscribe(onMqttUnsubscribe);
   mqttClient.onMessage(onMqttMessage);
   mqttClient.setServer(mqttHost, mqttPort);
@@ -329,8 +329,8 @@ void wirelessSetup(const char* ssid, const char* password, const char* mqttHost,
 
   connectToWifi();
   
-  Serial.print("\nMAC ADDRESS: ");
-  Serial.println(WiFi.macAddress().c_str());
+  //Serial.print("\nMAC ADDRESS: ");
+  //Serial.println(WiFi.macAddress().c_str());
   strcpy(espMacAddress, WiFi.macAddress().c_str());
   strcpy(robotName, name);
 }
@@ -359,14 +359,14 @@ void sendRobotData(char* tackleStatus, char* contollerStatus) {
     //serializeJson(data, Serial);
 
     if (mqttClient.publish("esp32/output", 0, false, buffer, n) == 0) {
-      Serial.print(" Error sending message\n");
+      //Serial.print(" Error sending message\n");
     }
     else {
       //Serial.print(" Success sending message\n");
     }
   }
   else if(WiFi.status() != WL_CONNECTED) {
-    Serial.println("Failed to send robot data. WiFi disconnected");
+    //Serial.println("Failed to send robot data. WiFi disconnected");
   }
   else if(!mqttClient.connected()) {
     //Serial.println("Failed to send robot data. MQTT disconnected");

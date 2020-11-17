@@ -155,3 +155,37 @@ This is a list of useful links and tutorials that were used.
 * Read IP address from EEPROM, has to be unique to each robot, faster if static but can be allocated by DHCP
 * Fix esp32 crashing when there is no robot name stored
 * Move contoller joystick reading code into drive files?
+
+## Performance Testing
+No wireless - 1130 microseconds
+Wireless with no WiFi connection - 
+Wireless With WiFi connection - 1130uS spikes up to 1650uS
+
+## Issues
+* Contoller disconnects after some amount of time if esp32 cannot connect to wifi. The contoller will not reconnect at all. For some reason if the contoller is connected and you move the joysticks, the esp32 will panic and reboot
+````
+ASSERT_PARAM(1 0), in ld_pscan.c at line 235
+Guru Meditation Error: Core  0 panic'ed (Interrupt wdt timeout on CPU0)
+Core 0 register dump:
+PC      : 0x40087c6d  PS      : 0x00060e34  A0      : 0x8003edb5  A1      : 0x3ffbe2b0  
+A2      : 0x00000001  A3      : 0x00000000  A4      : 0x00000000  A5      : 0x60008054  
+A6      : 0x3ffbdd44  A7      : 0x60008050  A8      : 0x80087c6d  A9      : 0x3ffbe290  
+A10     : 0x00000004  A11     : 0x00000000  A12     : 0x6000804c  A13     : 0xffffffff  
+A14     : 0x00000000  A15     : 0xfffffffc  SAR     : 0x00000004  EXCCAUSE: 0x00000005  
+EXCVADDR: 0x00000000  LBEG    : 0x40087ba5  LEND    : 0x40087bac  LCOUNT  : 0x00000000  
+Core 0 was running in ISR context:
+EPC1    : 0x4008183e  EPC2    : 0x00000000  EPC3    : 0x00000000  EPC4    : 0x40087c6d
+
+Backtrace: 0x40087c6d:0x3ffbe2b0 0x4003edb2:0x3ffbe2d0 0x40089206:0x3ffbe320 0x4008bcba:0x3ffbe340 0x4008c513:0x3ffbe360 0x400847e9:0x3ffbe380 0x401caad3:0x3ffbc140 0x400e1c76:0x3ffbc160 0x4008fe71:0x3ffbc180 0x4008e68d:0x3ffbc1a0
+
+Core 1 register dump:
+PC      : 0x400029ac  PS      : 0x00060234  A0      : 0x800d4f6d  A1      : 0x3ffce410  
+A2      : 0x00000000  A3      : 0x00000000  A4      : 0x00000000  A5      : 0x00190000  
+A6      : 0x7ff00000  A7      : 0x00000000  A8      : 0x00000000  A9      : 0x00000034  
+A10     : 0x00008000  A11     : 0x00000000  A12     : 0x3ffe49f4  A13     : 0x00000000  
+A14     : 0x00000000  A15     : 0x3ffcc580  SAR     : 0x0000001f  EXCCAUSE: 0x00000005  
+EXCVADDR: 0x00000000  LBEG    : 0x400029ac  LEND    : 0x400029cb  LCOUNT  : 0x00000004  
+
+Backtrace: 0x400029ac:0x3ffce410 0x400d4f6a:0x3ffce420 0x400d4f9e:0x3ffce450 0x400d4fd8:0x3ffce470 0x400d2049:0x3ffce490 0x400d2a82:0x3ffce4b0 0x400de8d9:0x3ffce4d0 0x4008e68d:0x3ffce4f0
+````
+

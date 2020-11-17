@@ -218,6 +218,7 @@ void setup() {// This is stuff for connecting the PS3 controller.
 
   #ifdef WIRELESS
     wirelessSetup(ssid, password, mqttHost, mqttPort, name);
+    connectToWifi();
   #endif
   
   // Attached the contoller connect function to connection callback and start contoller connection

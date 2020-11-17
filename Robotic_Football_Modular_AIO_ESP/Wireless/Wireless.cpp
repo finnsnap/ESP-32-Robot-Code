@@ -27,32 +27,30 @@ IPAddress ip;
 IPAddress gateway(192, 168, 4, 1);
 IPAddress subnet(255, 255, 255, 0);
 
-void setIPAddress(int number) {
-  ip = IPAddress(192, 168, 4, number);
-  //Serial.print("IPAddress of robot: ");
-  //ip.printTo(Serial);
-  //Serial.println();
-}
-    /**
- * Updates the esp32 code over http by connecting to a remote webserver
+
+
+/**
+ * Updates the esp32 code over http by connecting to a remote webserver. It defaults to a web path of "http://192.168.4.1:8080/public/binaries/" + filename passed to reprogram command
  */
-    void checkForUpdate()
-{
+void checkForUpdate() {
   if (updateStatus) {
+    // Disconnect from MQTT client and stop wifi and mqtt reconnect timers to be safe
     mqttClient.disconnect(true);
     xTimerStop(mqttReconnectTimer, 0);
     xTimerStop(wifiReconnectTimer, 0);
 
+    // Flash LEDs and then turn them off to let the user know robot is reprogramming itself
     flashLeds();
     ledsOff();
 
     Serial.println("MQTT disconnected");
-
     Serial.println("Reprogramming with: ");
     Serial.println("http://192.168.4.1:8080/public/binaries/" + filename);
 
+    // Run the httpUpdate funciton to start the update process
     t_httpUpdate_return ret = httpUpdate.update(wifiClient, "http://192.168.4.1:8080/public/binaries/" + filename);
     
+    // Get and handle any errors returned by the update process
     switch (ret) {
       case HTTP_UPDATE_FAILED:
         Serial.printf("HTTP_UPDATE_FAILED Error (%d): %s\n", httpUpdate.getLastError(), httpUpdate.getLastErrorString().c_str());
@@ -70,27 +68,30 @@ void setIPAddress(int number) {
 }
 
 /**
- * Connect to WiFi
+ * Sets the IP address of the robot using the given number as the last number in the IP 
+ * Eg. 192.168.4.XXX
+ * @param number The number to be set as the last part of the IP address
+ */
+void setIPAddress(int number) {
+  ip = IPAddress(192, 168, 4, number);
+  //Serial.print("IPAddress of robot: ");
+  //ip.printTo(Serial);
+  //Serial.println();
+}
+
+/**
+ * Connect to WiFi. No autoreconnect, persistance, using static ip and stored ssid and password
  */
 void connectToWifi() {
   //Serial.println("Connecting to Wi-Fi...");
   //WiFi.disconnect();
-  WiFi.setAutoReconnect(false);
-  /* See https://www.bakke.online/index.php/2017/05/22/reducing-wifi-power-consumption-on-esp8266-part-3/ for explanation */
+  /* See https://www.bakke.online/index.php/2017/05/22/reducing-wifi-power-consumption-on-esp8266-part-3/ for explanation and reason for static IP*/
 
+  WiFi.setAutoReconnect(false);
   WiFi.persistent(false);
   WiFi.mode(WIFI_STA);
   WiFi.config(ip, gateway, subnet);
   WiFi.begin(storedSsid, storedPassword);
-}
-
-/**
- * Connect to the MQTT server
- */
-void connectToMqtt() {
-  //Serial.println("Connecting to MQTT...");
-  mqttClient.disconnect();
-  mqttClient.connect();
 }
 
 /**
@@ -116,95 +117,14 @@ void WiFiEvent(WiFiEvent_t event) {
 }
 
 
-
-
-// void WiFiEvent(WiFiEvent_t event)
-// {
-//     Serial.printf("[WiFi-event] event: %d\n", event);
-//
-//     switch (event) {
-//         case SYSTEM_EVENT_WIFI_READY: 
-//             Serial.println("WiFi interface ready");
-//             break;
-//         case SYSTEM_EVENT_SCAN_DONE:
-//             Serial.println("Completed scan for access points");
-//             break;
-//         case SYSTEM_EVENT_STA_START:
-//             Serial.println("WiFi client started");
-//             break;
-//         case SYSTEM_EVENT_STA_STOP:
-//             Serial.println("WiFi clients stopped");
-//             break;
-//         case SYSTEM_EVENT_STA_CONNECTED:
-//             Serial.println("Connected to access point");
-//             break;
-//         case SYSTEM_EVENT_STA_DISCONNECTED:
-//             Serial.println("Disconnected from WiFi access point");
-//             break;
-//         case SYSTEM_EVENT_STA_AUTHMODE_CHANGE:
-//             Serial.println("Authentication mode of access point has changed");
-//             break;
-//         case SYSTEM_EVENT_STA_GOT_IP:
-//             Serial.print("Obtained IP address: ");
-//             Serial.println(WiFi.localIP());
-//             break;
-//         case SYSTEM_EVENT_STA_LOST_IP:
-//             Serial.println("Lost IP address and IP address is reset to 0");
-//             break;
-//         case SYSTEM_EVENT_STA_WPS_ER_SUCCESS:
-//             Serial.println("WiFi Protected Setup (WPS): succeeded in enrollee mode");
-//             break;
-//         case SYSTEM_EVENT_STA_WPS_ER_FAILED:
-//             Serial.println("WiFi Protected Setup (WPS): failed in enrollee mode");
-//             break;
-//         case SYSTEM_EVENT_STA_WPS_ER_TIMEOUT:
-//             Serial.println("WiFi Protected Setup (WPS): timeout in enrollee mode");
-//             break;
-//         case SYSTEM_EVENT_STA_WPS_ER_PIN:
-//             Serial.println("WiFi Protected Setup (WPS): pin code in enrollee mode");
-//             break;
-//         case SYSTEM_EVENT_AP_START:
-//             Serial.println("WiFi access point started");
-//             break;
-//         case SYSTEM_EVENT_AP_STOP:
-//             Serial.println("WiFi access point  stopped");
-//             break;
-//         case SYSTEM_EVENT_AP_STACONNECTED:
-//             Serial.println("Client connected");
-//             break;
-//         case SYSTEM_EVENT_AP_STADISCONNECTED:
-//             Serial.println("Client disconnected");
-//             break;
-//         case SYSTEM_EVENT_AP_STAIPASSIGNED:
-//             Serial.println("Assigned IP address to client");
-//             break;
-//         case SYSTEM_EVENT_AP_PROBEREQRECVED:
-//             Serial.println("Received probe request");
-//             break;
-//         case SYSTEM_EVENT_GOT_IP6:
-//             Serial.println("IPv6 is preferred");
-//             break;
-//         case SYSTEM_EVENT_ETH_START:
-//             Serial.println("Ethernet started");
-//             break;
-//         case SYSTEM_EVENT_ETH_STOP:
-//             Serial.println("Ethernet stopped");
-//             break;
-//         case SYSTEM_EVENT_ETH_CONNECTED:
-//             Serial.println("Ethernet connected");
-//             break;
-//         case SYSTEM_EVENT_ETH_DISCONNECTED:
-//             Serial.println("Ethernet disconnected");
-//             break;
-//         case SYSTEM_EVENT_ETH_GOT_IP:
-//             Serial.println("Obtained IP address");
-//             break;
-//         default: break;
-//     }}
-
-
-
-
+/**
+ * Connect to the MQTT server
+ */
+void connectToMqtt() {
+  //Serial.println("Connecting to MQTT...");
+  mqttClient.disconnect(true);
+  mqttClient.connect();
+}
 
 
 /**
@@ -231,6 +151,7 @@ void onMqttConnect(bool sessionPresent) {
   // Serial.println(packetIdPub2);
 }
 
+
 /**
  * Callback function for when the MQTT client is disconnected from the server
  * @param reason The reason why the mqtt client was disconnected
@@ -241,26 +162,6 @@ void onMqttDisconnect(AsyncMqttClientDisconnectReason reason) {
   if (WiFi.isConnected()) {
     xTimerStart(mqttReconnectTimer, 0);
   }
-}
-
-/**
- * Callback function for acknowledging a subscription to a topic
- */
-void onMqttSubscribe(uint16_t packetId, uint8_t qos) {
-  //Serial.println("Subscribe acknowledged.");
-  //Serial.print("  packetId: ");
-  //Serial.println(packetId);
-  //Serial.print("  qos: ");
-  //Serial.println(qos);
-}
-
-/**
- * Callback function for acknowledging an unsubscription from a topic
- */
-void onMqttUnsubscribe(uint16_t packetId) {
-  //Serial.println("Unsubscribe acknowledged.");
-  //Serial.print("  packetId: ");
-  //Serial.println(packetId);
 }
 
 
@@ -311,6 +212,14 @@ void onMqttMessage(char* topic, char* payload, AsyncMqttClientMessageProperties 
   }
 }
 
+/**
+ * Sets up all the required parts before starting any of the wireless functionality. Must be run before any other functions from this file are called as it sets variables that are used in the other functions. 
+ * @param ssid The name of the WiFi network to connect to
+ * @param passwod The password of the WiFi network
+ * @param mqttHost The server that the mqtt host is on
+ * @param mqttPort The port that the mqtt server is listening too
+ * @param name The name of the robot
+ */
 void wirelessSetup(const char* ssid, const char* password, const char* mqttHost, const uint16_t mqttPort, char* name) {
   mqttReconnectTimer = xTimerCreate("mqttTimer", pdMS_TO_TICKS(500), pdFALSE, (void*)0, reinterpret_cast<TimerCallbackFunction_t>(connectToMqtt));
   wifiReconnectTimer = xTimerCreate("wifiTimer", pdMS_TO_TICKS(3000), pdFALSE, (void*)0, reinterpret_cast<TimerCallbackFunction_t>(connectToWifi));
@@ -326,21 +235,22 @@ void wirelessSetup(const char* ssid, const char* password, const char* mqttHost,
 
   storedSsid = ssid;
   storedPassword = password;
-
-  connectToWifi();
   
-  //Serial.print("\nMAC ADDRESS: ");
-  //Serial.println(WiFi.macAddress().c_str());
+  // Stores the esp MAC address and robot name to send to the webserver
   strcpy(espMacAddress, WiFi.macAddress().c_str());
   strcpy(robotName, name);
 }
 
-
+/**
+ * Sends the robot data over MQTT to the webserver
+ * @param tackleStatus The current status of the tackle sensor
+ * @param contollerStatus The current status of the contoller
+ */
 void sendRobotData(char* tackleStatus, char* contollerStatus) {
   if(WiFi.status() == WL_CONNECTED && mqttClient.connected()) {
+    
     // JSON variables for sending data to webserver
-    const int capacity = JSON_OBJECT_SIZE(8);
-    StaticJsonDocument<capacity> data;
+    StaticJsonDocument<JSON_OBJECT_SIZE(8)> data;
     char buffer[256];
 
     // From initilization

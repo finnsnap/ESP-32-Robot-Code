@@ -53,9 +53,9 @@ void driveCtrl(int handicap, int leftX, int leftY, int rightX, int rightY)
     drive--; // Decelerates
 
   if (turn < rightX)
-    turn++; //Turns left?
+    turn++; //Turns right?
   else if (turn > rightX)
-    turn--; //Turns right?
+    turn--; //Turns left?
 
   // These are the final variables that decide motor speed
   throttleL = motorDirection * ((drive - turn) / handicap);

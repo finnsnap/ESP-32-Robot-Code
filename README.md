@@ -156,6 +156,9 @@ This is a list of useful links and tutorials that were used.
 * Fix esp32 crashing when there is no robot name stored
 * Move contoller joystick reading code into drive files?
 
+* Change it so that you have 5 seconds on poweron to connect to wifi and afterwards it wont try
+* If wifi ever gets disconnected during operation then just give up on it
+
 ## Performance Testing
 No wireless - 1130 microseconds
 Wireless with no WiFi connection - 

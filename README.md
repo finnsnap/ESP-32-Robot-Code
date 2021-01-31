@@ -155,9 +155,12 @@ This is a list of useful links and tutorials that were used.
 * Read IP address from EEPROM, has to be unique to each robot, faster if static but can be allocated by DHCP
 * Fix esp32 crashing when there is no robot name stored
 * Move contoller joystick reading code into drive files?
+* Add a check for a valid name in the readStoredName function
 
 * Change it so that you have 5 seconds on poweron to connect to wifi and afterwards it wont try
 * If wifi ever gets disconnected during operation then just give up on it
+
+* Check wifi every cycle? Maybe faster than waiting for a wifi event callback.
 
 ## Performance Testing
 No wireless - 1130 microseconds

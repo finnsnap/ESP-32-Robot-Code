@@ -6,6 +6,12 @@
 #include "Wireless/Wireless.cpp"
 #define WIRELESS
 
+
+String codeVersion = "v1.0";
+
+
+
+
 //===========Uncomment a LED===========================
 #ifndef WIRELESS
   #include "Leds/Leds.cpp"
@@ -120,7 +126,11 @@ char* macAddressList[18] = {"00:15:83:f3:e8:d8", "00:15:83:3d:0a:57", "00:1b:dc:
                              "00:1b:dc:0f:dc:2d", "00:1b:dc:0f:e8:af", "00:15:83:f3:e8:e8"};
 
 
-
+/**
+ * @brief Writes the given string to the ESP EEPROM
+ * 
+ * @param data The name of the robot to store
+ */
 void writeStoredName(String data) {
   preferences.begin("RobotName");
   preferences.putString("name", data);
@@ -196,10 +206,10 @@ int readJoystick(int8_t analogValue) {
   // Deal with stickyness from joysticks
   if (abs(value) < 8) value = 0;
 
-  //Serial.print("analogValue: ");
-  //Serial.print(analogValue);
-  //Serial.print("\tvalue: ");
-  //Serial.println(value);
+  // Serial.print("analogValue: ");
+  // Serial.print(analogValue);
+  // Serial.print("\tvalue: ");
+  // Serial.println(value);
 
   return value;
 }
@@ -214,11 +224,12 @@ void setup() {// This is stuff for connecting the PS3 controller.
   // String dadfa = "rK9";
   // writeStoredName(dadfa);
 
-  readStoredName(); // Add check for valid contoller mac address
+  readStoredName();
 
   #ifdef WIRELESS
     wirelessSetup(ssid, password, mqttHost, mqttPort, name);
-    connectToWifi();
+    if(!connectToWifi()) Serial.println("WiFi connected");
+    else Serial.println("WiFi not connected :(");
   #endif
   
   // Attached the contoller connect function to connection callback and start contoller connection
@@ -392,7 +403,7 @@ void loop() {
     now = millis();
     if (millis() - lastMsg > 200) {
       lastMsg = millis();
-      sendRobotData(tackleStatus, contollerStatus);
+      sendRobotData(codeVersion, tackleStatus, contollerStatus, analogRead(batteryPin));
       // Serial.println("Sent robot data");
       // Serial.print("NEW CODE!!!!");
       checkForUpdate();

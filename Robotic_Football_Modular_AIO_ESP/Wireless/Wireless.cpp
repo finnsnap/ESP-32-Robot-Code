@@ -11,8 +11,8 @@
 WiFiClient wifiClient;
 
 AsyncMqttClient mqttClient;
-TimerHandle_t mqttReconnectTimer;
-TimerHandle_t wifiReconnectTimer;
+//TimerHandle_t mqttReconnectTimer;
+//TimerHandle_t wifiReconnectTimer;
 
 char robotName[4];
 char espMacAddress[18];
@@ -29,15 +29,16 @@ IPAddress subnet(255, 255, 255, 0);
 
 
 
+
 /**
- * Updates the esp32 code over http by connecting to a remote webserver. It defaults to a web path of "http://192.168.4.1:8080/public/binaries/" + filename passed to reprogram command
+ * Updates the esp32 code over http by connecting to a remote webserver. It defaults to a web path of %"http://192.168.4.1:8080/public/binaries/" + filename% passed to reprogram command
  */
 void checkForUpdate() {
   if (updateStatus) {
     // Disconnect from MQTT client and stop wifi and mqtt reconnect timers to be safe
+    //xTimerStop(mqttReconnectTimer, 0);
     mqttClient.disconnect(true);
-    xTimerStop(mqttReconnectTimer, 0);
-    xTimerStop(wifiReconnectTimer, 0);
+    //xTimerStop(wifiReconnectTimer, 0);
 
     // Flash LEDs and then turn them off to let the user know robot is reprogramming itself
     flashLeds();
@@ -79,43 +80,46 @@ void setIPAddress(int number) {
   //Serial.println();
 }
 
+
+
+
+bool connectingToWifi = false;
+
+
 /**
  * Connect to WiFi. No autoreconnect, persistance, using static ip and stored ssid and password
+ * See https://www.bakke.online/index.php/2017/05/22/reducing-wifi-power-consumption-on-esp8266-part-3/ for explanation and reason for static IP
  */
-void connectToWifi() {
+int connectToWifi() {
   //Serial.println("Connecting to Wi-Fi...");
   //WiFi.disconnect();
-  /* See https://www.bakke.online/index.php/2017/05/22/reducing-wifi-power-consumption-on-esp8266-part-3/ for explanation and reason for static IP*/
 
+  connectingToWifi = true;
+  
+  WiFi.disconnect();
   WiFi.setAutoReconnect(false);
   WiFi.persistent(false);
   WiFi.mode(WIFI_STA);
   WiFi.config(ip, gateway, subnet);
   WiFi.begin(storedSsid, storedPassword);
-}
 
-/**
- * Callback function for a WiFiEvent
- * @param event The WiFi event
- */
-void WiFiEvent(WiFiEvent_t event) {
-    //Serial.printf("[WiFi-event] event: %d\n", event);
-    switch(event) {
-    case SYSTEM_EVENT_STA_GOT_IP:
-        xTimerStop(wifiReconnectTimer, 0);
-        //Serial.println("WiFi connected");
-        //Serial.println("IP address: ");
-        //Serial.println(WiFi.localIP());
-        connectToMqtt();
-        break;
-    case SYSTEM_EVENT_STA_DISCONNECTED:
-        //Serial.println("WiFi lost connection");
-        xTimerStop(mqttReconnectTimer, 0); // ensure we don't reconnect to MQTT while reconnecting to Wi-Fi
-		    xTimerStart(wifiReconnectTimer, 0);
-        break;
+  for(int i = 0; i < 10; i++) {
+    if(WiFi.status() == WL_CONNECTED) {
+      connectingToWifi = false;
+      return 0;
     }
-}
+    else {
+      Serial.println("Connecting..........");
+    }
 
+    delay(1000);
+  }
+
+  // WiFi did not connect so disconnect
+  WiFi.disconnect();
+  connectingToWifi = false;
+  return 1;
+}
 
 /**
  * Connect to the MQTT server
@@ -128,11 +132,42 @@ void connectToMqtt() {
 
 
 /**
+ * Callback function for a WiFiEvent
+ * @param event The WiFi event
+ */
+void WiFiEvent(WiFiEvent_t event) {
+    //Serial.printf("[WiFi-event] event: %d\n", event);
+    switch(event) {
+    case SYSTEM_EVENT_STA_GOT_IP:
+        //xTimerStop(wifiReconnectTimer, 0);
+        //Serial.println("WiFi connected");
+        //Serial.println("IP address: ");
+        //Serial.println(WiFi.localIP());
+        connectToMqtt();
+        break;
+    case SYSTEM_EVENT_STA_DISCONNECTED:
+        //Serial.println("WiFi lost connection");
+        //xTimerStop(mqttReconnectTimer, 0); // ensure we don't reconnect to MQTT while reconnecting to Wi-Fi
+        if(!connectingToWifi) {
+          WiFi.disconnect();
+          Serial.println("WiFi disconnected");
+        }
+
+		    //xTimerStart(wifiReconnectTimer, 0);
+        break;
+    }
+}
+
+
+
+
+
+/**
  * Callback function for when connected to the MQTT server
  * @param sessionPresent Wheather the session is present or not
  */
 void onMqttConnect(bool sessionPresent) {
-  xTimerStop(mqttReconnectTimer, 0);
+  //xTimerStop(mqttReconnectTimer, 0);
   //Serial.println("Connected to MQTT.");
   //Serial.print("Session present: ");
   //Serial.println(sessionPresent);
@@ -160,7 +195,7 @@ void onMqttDisconnect(AsyncMqttClientDisconnectReason reason) {
   //Serial.println("Disconnected from MQTT.");
 
   if (WiFi.isConnected()) {
-    xTimerStart(mqttReconnectTimer, 0);
+    //xTimerStart(mqttReconnectTimer, 0);
   }
 }
 
@@ -221,8 +256,8 @@ void onMqttMessage(char* topic, char* payload, AsyncMqttClientMessageProperties 
  * @param name The name of the robot
  */
 void wirelessSetup(const char* ssid, const char* password, const char* mqttHost, const uint16_t mqttPort, char* name) {
-  mqttReconnectTimer = xTimerCreate("mqttTimer", pdMS_TO_TICKS(500), pdFALSE, (void*)0, reinterpret_cast<TimerCallbackFunction_t>(connectToMqtt));
-  wifiReconnectTimer = xTimerCreate("wifiTimer", pdMS_TO_TICKS(3000), pdFALSE, (void*)0, reinterpret_cast<TimerCallbackFunction_t>(connectToWifi));
+  //mqttReconnectTimer = xTimerCreate("mqttTimer", pdMS_TO_TICKS(500), pdFALSE, (void*)0, reinterpret_cast<TimerCallbackFunction_t>(connectToMqtt));
+  //wifiReconnectTimer = xTimerCreate("wifiTimer", pdMS_TO_TICKS(3000), pdFALSE, (void*)0, reinterpret_cast<TimerCallbackFunction_t>(connectToWifi));
 
   WiFi.onEvent(WiFiEvent);
 
@@ -246,11 +281,12 @@ void wirelessSetup(const char* ssid, const char* password, const char* mqttHost,
  * @param tackleStatus The current status of the tackle sensor
  * @param contollerStatus The current status of the contoller
  */
-void sendRobotData(char* tackleStatus, char* contollerStatus) {
+void sendRobotData(String codeVersion, char* tackleStatus, char* contollerStatus, int batteryLevel) {
   if(WiFi.status() == WL_CONNECTED && mqttClient.connected()) {
     
     // JSON variables for sending data to webserver
-    StaticJsonDocument<JSON_OBJECT_SIZE(8)> data;
+    // Max size of packet is 256 chars including brackets and other parts
+    StaticJsonDocument<JSON_OBJECT_SIZE(20)> data;
     char buffer[256];
 
     // From initilization
@@ -258,15 +294,18 @@ void sendRobotData(char* tackleStatus, char* contollerStatus) {
     data["espMacAddress"] = espMacAddress;
 
     // Stuff from function input
-    data["batteryLevel"] =  "22";
+    data["batteryLevel"] =  batteryLevel;
     data["tackleStatus"] = tackleStatus;
     data["contollerStatus"] = contollerStatus;
+    data["ipAddress"] = WiFi.localIP().toString();
+    data["codeVersion"] = codeVersion;
 
     // Serialize JSON into the buffer array
     size_t n = serializeJson(data, buffer);
 
     // Print json data to serial port
-    //serializeJson(data, Serial);
+    serializeJson(data, Serial);
+    Serial.println();
 
     if (mqttClient.publish("esp32/output", 0, false, buffer, n) == 0) {
       //Serial.print(" Error sending message\n");

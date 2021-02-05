@@ -14,20 +14,20 @@ AsyncMqttClient mqttClient;
 //TimerHandle_t mqttReconnectTimer;
 //TimerHandle_t wifiReconnectTimer;
 
+// Storing names of stuff
 char robotName[4];
 char espMacAddress[18];
-
 const char* storedSsid;
 const char* storedPassword;
 
 bool updateStatus = false;
 String filename = "";
 
+// Storing wireless info
 IPAddress ip;
 IPAddress gateway(192, 168, 4, 1);
 IPAddress subnet(255, 255, 255, 0);
-
-
+bool connectingToWifi = false;
 
 
 /**
@@ -35,15 +35,15 @@ IPAddress subnet(255, 255, 255, 0);
  */
 void checkForUpdate() {
   if (updateStatus) {
-    // Disconnect from MQTT client and stop wifi and mqtt reconnect timers to be safe
-    //xTimerStop(mqttReconnectTimer, 0);
+    // Disconnect from MQTT client so there are no interruptions
     mqttClient.disconnect(true);
-    //xTimerStop(wifiReconnectTimer, 0);
 
-    // Flash LEDs and then turn them off to let the user know robot is reprogramming itself
+    // Flash LEDs twice and then turn them off to let the user know robot is reprogramming itself
+    flashLeds();
     flashLeds();
     ledsOff();
 
+    // Info for serial port if it connected
     Serial.println("MQTT disconnected");
     Serial.println("Reprogramming with: ");
     Serial.println("http://192.168.4.1:8080/public/binaries/" + filename);
@@ -68,6 +68,7 @@ void checkForUpdate() {
   }
 }
 
+
 /**
  * Sets the IP address of the robot using the given number as the last number in the IP 
  * Eg. 192.168.4.XXX
@@ -81,21 +82,18 @@ void setIPAddress(int number) {
 }
 
 
-
-
-bool connectingToWifi = false;
-
-
 /**
  * Connect to WiFi. No autoreconnect, persistance, using static ip and stored ssid and password
  * See https://www.bakke.online/index.php/2017/05/22/reducing-wifi-power-consumption-on-esp8266-part-3/ for explanation and reason for static IP
+ * @return int If the wifi connected (0) or if it failed (1)
  */
 int connectToWifi() {
-  //Serial.println("Connecting to Wi-Fi...");
-  //WiFi.disconnect();
-
+  Serial.println("Connecting to Wi-Fi...");
+  
+  // Flag so WiFi event does not cause disconnect
   connectingToWifi = true;
   
+  // Start the wifi connection process with the correct settings
   WiFi.disconnect();
   WiFi.setAutoReconnect(false);
   WiFi.persistent(false);
@@ -103,6 +101,7 @@ int connectToWifi() {
   WiFi.config(ip, gateway, subnet);
   WiFi.begin(storedSsid, storedPassword);
 
+  // Wait 10 seconds to give the wifi a chance to connect
   for(int i = 0; i < 10; i++) {
     if(WiFi.status() == WL_CONNECTED) {
       connectingToWifi = false;
@@ -121,6 +120,7 @@ int connectToWifi() {
   return 1;
 }
 
+
 /**
  * Connect to the MQTT server
  */
@@ -136,30 +136,21 @@ void connectToMqtt() {
  * @param event The WiFi event
  */
 void WiFiEvent(WiFiEvent_t event) {
-    //Serial.printf("[WiFi-event] event: %d\n", event);
-    switch(event) {
+  //Serial.printf("[WiFi-event] event: %d\n", event);
+  switch(event) {
     case SYSTEM_EVENT_STA_GOT_IP:
-        //xTimerStop(wifiReconnectTimer, 0);
-        //Serial.println("WiFi connected");
-        //Serial.println("IP address: ");
-        //Serial.println(WiFi.localIP());
         connectToMqtt();
         break;
     case SYSTEM_EVENT_STA_DISCONNECTED:
-        //Serial.println("WiFi lost connection");
-        //xTimerStop(mqttReconnectTimer, 0); // ensure we don't reconnect to MQTT while reconnecting to Wi-Fi
+        // Flag to ensure that event does not fire during wifi setup process
         if(!connectingToWifi) {
           WiFi.disconnect();
           Serial.println("WiFi disconnected");
         }
 
-		    //xTimerStart(wifiReconnectTimer, 0);
         break;
     }
 }
-
-
-
 
 
 /**
@@ -167,41 +158,13 @@ void WiFiEvent(WiFiEvent_t event) {
  * @param sessionPresent Wheather the session is present or not
  */
 void onMqttConnect(bool sessionPresent) {
-  //xTimerStop(mqttReconnectTimer, 0);
-  //Serial.println("Connected to MQTT.");
-  //Serial.print("Session present: ");
-  //Serial.println(sessionPresent);
-  
   uint16_t packetIdSub = mqttClient.subscribe(robotName, 2);
-  //Serial.print("Subscribing at QoS 2, packetId: ");
-  //Serial.println(packetIdSub);
-  
-  // mqttClient.publish("esp32/output", 0, true, "test 1");
-  // Serial.println("Publishing at QoS 0");
-  // uint16_t packetIdPub1 = mqttClient.publish("esp32/output", 1, true, "test 2");
-  // Serial.print("Publishing at QoS 1, packetId: ");
-  // Serial.println(packetIdPub1);
-  // uint16_t packetIdPub2 = mqttClient.publish("esp32/output", 2, true, "test 3");
-  // Serial.print("Publishing at QoS 2, packetId: ");
-  // Serial.println(packetIdPub2);
+
 }
 
 
 /**
- * Callback function for when the MQTT client is disconnected from the server
- * @param reason The reason why the mqtt client was disconnected
- */
-void onMqttDisconnect(AsyncMqttClientDisconnectReason reason) {
-  //Serial.println("Disconnected from MQTT.");
-
-  if (WiFi.isConnected()) {
-    //xTimerStart(mqttReconnectTimer, 0);
-  }
-}
-
-
-/**
- * Callback function for when a message is recieved from the MQTT server
+ * Callback function for when a message is recieved from the MQTT server. Used for recieving remote commands like reprogramming
  * @param topic The topic that the message was recieved on
  * @param payload The actual message itself
  * @param properties If the message has any properties
@@ -247,6 +210,7 @@ void onMqttMessage(char* topic, char* payload, AsyncMqttClientMessageProperties 
   }
 }
 
+
 /**
  * Sets up all the required parts before starting any of the wireless functionality. Must be run before any other functions from this file are called as it sets variables that are used in the other functions. 
  * @param ssid The name of the WiFi network to connect to
@@ -256,18 +220,15 @@ void onMqttMessage(char* topic, char* payload, AsyncMqttClientMessageProperties 
  * @param name The name of the robot
  */
 void wirelessSetup(const char* ssid, const char* password, const char* mqttHost, const uint16_t mqttPort, char* name) {
-  //mqttReconnectTimer = xTimerCreate("mqttTimer", pdMS_TO_TICKS(500), pdFALSE, (void*)0, reinterpret_cast<TimerCallbackFunction_t>(connectToMqtt));
-  //wifiReconnectTimer = xTimerCreate("wifiTimer", pdMS_TO_TICKS(3000), pdFALSE, (void*)0, reinterpret_cast<TimerCallbackFunction_t>(connectToWifi));
-
+  // Connects wifi events to the event handler
   WiFi.onEvent(WiFiEvent);
 
+  // Sets the mqtt connection and message functions as well as the server
   mqttClient.onConnect(onMqttConnect);
-  mqttClient.onDisconnect(onMqttDisconnect);
-  //mqttClient.onSubscribe(onMqttSubscribe);
-  //mqttClient.onUnsubscribe(onMqttUnsubscribe);
   mqttClient.onMessage(onMqttMessage);
   mqttClient.setServer(mqttHost, mqttPort);
 
+  // Stores the ssid and password for connecting to the correct wifi network
   storedSsid = ssid;
   storedPassword = password;
   
@@ -275,6 +236,7 @@ void wirelessSetup(const char* ssid, const char* password, const char* mqttHost,
   strcpy(espMacAddress, WiFi.macAddress().c_str());
   strcpy(robotName, name);
 }
+
 
 /**
  * Sends the robot data over MQTT to the webserver

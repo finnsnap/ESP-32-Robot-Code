@@ -294,7 +294,7 @@ void sendRobotData(String codeVersion, char* tackleStatus, char* contollerStatus
     data["espMacAddress"] = espMacAddress;
 
     // Stuff from function input
-    data["batteryLevel"] =  batteryLevel;
+    data["batteryLevel"] =  batteryLevel * 12.0 / 4096.0;
     data["tackleStatus"] = tackleStatus;
     data["contollerStatus"] = contollerStatus;
     data["ipAddress"] = WiFi.localIP().toString();

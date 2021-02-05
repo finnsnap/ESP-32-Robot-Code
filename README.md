@@ -161,6 +161,7 @@ This is a list of useful links and tutorials that were used.
 * If wifi ever gets disconnected during operation then just give up on it
 
 * Check wifi every cycle? Maybe faster than waiting for a wifi event callback.
+* Add calibration data for motors to esp
 
 ## Performance Testing
 No wireless - 1130 microseconds

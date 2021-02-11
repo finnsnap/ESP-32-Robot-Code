@@ -399,11 +399,17 @@ void loop() {
   // }
 
   #ifdef WIRELESS
+  // Measures voltage when at rest
+    int batteryMeas = 0;
+    if (leftX == 0 && leftY == 0 && rightX == 0 && rightY == 0) {
+      batteryMeas = analogRead(batteryPin) / 4096 * 3.3;
+    }
+
     // Stores the current time
     now = millis();
     if (millis() - lastMsg > 200) {
       lastMsg = millis();
-      sendRobotData(codeVersion, tackleStatus, contollerStatus, analogRead(batteryPin));
+      sendRobotData(codeVersion, tackleStatus, contollerStatus, batteryMeas);
       // Serial.println("Sent robot data");
       // Serial.print("NEW CODE!!!!");
       checkForUpdate();
